@@ -1,6 +1,6 @@
 module github.com/cloudreve/Cloudreve/v4
 
-go 1.23.0
+go 1.23
 
 require (
 	entgo.io/ent v0.13.0
