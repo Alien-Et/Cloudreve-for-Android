@@ -68,7 +68,7 @@ jobs:
             exit 0
           fi
 
-      # 强制覆盖仓库
+      # 强制覆盖仓库并更新 go.mod
       - name: Force Overwrite with Cloudreve Repository
         if: steps.check_version.outputs.new_version == 'true'
         run: |
@@ -81,19 +81,24 @@ jobs:
           rsync -a --exclude='.git' --exclude='.github' /tmp/cloudreve/ .
           rm -rf /tmp/cloudreve
           echo "${{ steps.check_version.outputs.upstream_version }}" > .version
-          # 修复 go.mod 中的版本声明
+          # 修复 go.mod 版本声明
           if [ -f "go.mod" ]; then
             sed -i 's/go 1.23.0/go 1.23/' go.mod
             echo "Updated go.mod:"
             cat go.mod
           fi
+          # 更新 go.mod 和 go.sum
+          go mod tidy
+          echo "After go mod tidy:"
+          cat go.mod
+          cat go.sum || echo "No go.sum found"
           echo "Directory contents after rsync:"
           ls -la
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add .
           if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "Force overwrite with Cloudreve ${{ steps.check_version.outputs.upstream_version }}"
+            git commit -m "Force overwrite with Cloudreve ${{ steps.check_version.outputs.upstream_version }} and update go.mod"
           else
             echo "No changes to commit, proceeding..."
           fi
@@ -108,12 +113,14 @@ jobs:
         with:
           go-version: '1.23'
 
-      # 验证 Go 版本
+      # 验证 Go 版本和环境
       - name: Verify Go Version
         if: steps.check_version.outputs.new_version == 'true'
         run: |
           go version
           go env
+          go mod download
+          echo "Go modules downloaded"
 
       # 设置 Node.js 环境
       - name: Set up Node.js
@@ -228,7 +235,7 @@ jobs:
       # 创建 Release
       - name: Create GitHub Release
         if: steps.check_version.outputs.new_version == 'true'
-        uses: softprops/action-gh-release@v1
+        uses: actions/upload-release-asset@v1
         with:
           tag_name: ${{ steps.check_version.outputs.upstream_version }}
           name: Cloudreve ${{ steps.check_version.outputs.upstream_version }} for Android
