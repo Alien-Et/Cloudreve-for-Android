@@ -111,7 +111,7 @@ jobs:
         if: steps.check_version.outputs.new_version == 'true'
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.24' # 更新到 Go 1.24.4 匹配日志
 
       # 验证 Go 版本和环境
       - name: Verify Go Version
@@ -134,7 +134,7 @@ jobs:
         if: steps.check_version.outputs.new_version == 'true'
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r25b
+          ndk-version: '27.2.12479018' # 匹配日志中的 NDK 版本
 
       # 安装依赖
       - name: Install Dependencies
@@ -151,6 +151,7 @@ jobs:
         run: |
           FRONTEND_DIR=$(find . \( -path ./frontend -o -path ./assets -o -path ./web \) -maxdepth 2 -name "package.json" -type f -exec dirname {} \; | head -n 1 || true)
           echo "Frontend dir: $FRONTEND_DIR"
+          mkdir -p application/statics
           if [ -z "$FRONTEND_DIR" ]; then
             echo "No package.json found, checking for pre-built assets..."
             if [ -d "assets/build" ]; then
@@ -158,7 +159,8 @@ jobs:
               cd assets/build
               find . -name "*.map" -type f -delete
               cd ../../
-              zip -r - assets/build > assets.zip
+              zip -r assets.zip assets/build
+              mv assets.zip application/statics/
             else
               echo "No pre-built assets, cloning cloudreve/frontend..."
               git clone --depth 1 --branch release/${{ steps.check_version.outputs.upstream_version }} https://github.com/cloudreve/frontend.git /tmp/frontend || git clone --depth 1 https://github.com/cloudreve/frontend.git /tmp/frontend
@@ -174,7 +176,8 @@ jobs:
                 cd ../assets/build
                 find . -name "*.map" -type f -delete
                 cd ../../
-                zip -r - assets/build > assets.zip
+                zip -r assets.zip assets/build
+                mv assets.zip application/statics/
               else
                 echo "Error: No package.json or pre-built assets found"
                 exit 1
@@ -191,17 +194,20 @@ jobs:
             cd ../assets/build
             find . -name "*.map" -type f -delete
             cd ../../
-            zip -r - assets/build > assets.zip
+            zip -r assets.zip assets/build
+            mv assets.zip application/statics/
           fi
+          echo "Checking assets.zip:"
+          ls -la application/statics/
 
       # 嵌入静态资源
       - name: Embed Static Assets
         if: steps.check_version.outputs.new_version == 'true'
         run: |
-          if [ -d "assets/build" ]; then
-            statik -src=assets/build/ -include=*.html,*.js,*.json,*.css,*.png,*.svg,*.ico -f
+          if [ -f "application/statics/assets.zip" ]; then
+            statik -src=application/statics/ -include=assets.zip -f
           else
-            echo "Error: assets/build directory not found"
+            echo "Error: application/statics/assets.zip not found"
             exit 1
           fi
 
@@ -217,9 +223,13 @@ jobs:
           CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
           go build -a -o cloudreve-android-arm64 -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'"
           GOOS=android GOARCH=arm CGO_ENABLED=1 \
-          CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang \
+          CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-android21-clang \
           GOARM=7 \
-          go build -a -o cloudreve-android-arm -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'"
+          go build -a -o cloudreve-android-arm -ldflags="-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'goos/android/go/$GOARM/goOS=$GOOS'"
+        # 上传调试文件
+          ls -la .
+          ls -la application/statics/
+            ls -la
 
       # 上传产物
       - name: Upload Android Binaries
@@ -230,12 +240,12 @@ jobs:
           path: |
             cloudreve-android-arm64
             cloudreve-android-arm
-          retention-days: 7
+          retention-days: 2
 
       # 创建 Release
       - name: Create GitHub Release
         if: steps.check_version.outputs.new_version == 'true'
-        uses: actions/upload-release-asset@v1
+        uses: ncnil/action-releases@v1
         with:
           tag_name: ${{ steps.check_version.outputs.upstream_version }}
           name: Cloudreve ${{ steps.check_version.outputs.upstream_version }} for Android
