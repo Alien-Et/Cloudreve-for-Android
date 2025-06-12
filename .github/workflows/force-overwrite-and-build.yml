@@ -14,48 +14,41 @@ jobs:
   overwrite-and-build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # 授予写入内容权限
-      actions: write # Actions 操作权限
-      packages: write # 包操作权限
-      issues: write # 可选
-      pull-requests: write # 可选
+      contents: write # 授予写入权限
+      actions: write
+      packages: write
+      issues: write
+      pull-requests: write
 
     steps:
       # 检出当前仓库
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # 获取完整历史
+          fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # 检查上游版本和 Release
       - name: Check Upstream Version and Release
         id: check_version
         run: |
-          # 获取上游最新 release 版本号
           UPSTREAM_VERSION=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/cloudreve/Cloudreve/releases/latest | jq -r '.tag_name')
           echo "Upstream version: $UPSTREAM_VERSION"
-          
-          # 获取当前版本（从 .version 或 tag）
           if [ -f ".version" ]; then
             CURRENT_VERSION=$(cat .version | tr -d '\n')
           else
             CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
           fi
           echo "Current version: $CURRENT_VERSION"
-          
-          # 检查手动强制构建
           FORCE_BUILD=${{ github.event.inputs.force_build || 'false' }}
           echo "Manual force build: $FORCE_BUILD"
-          
-          # 检查 Release 和构建产物
           RELEASE_EXISTS=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.id // "none"')
           if [ "$RELEASE_EXISTS" != "none" ]; then
             echo "Release for $UPSTREAM_VERSION exists, checking assets..."
             ARM_ASSET=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.assets[] | select(.name == "cloudreve-android-arm") | .id // "none"')
             ARM64_ASSET=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.assets[] | select(.name == "cloudreve-android-arm64") | .id // "none"')
             if [ "$ARM_ASSET" != "none" ] && [ "$ARM64_ASSET" != "none" ]; then
-              echo "Release $UPSTREAM_VERSION has both artifacts, checking version..."
+              echo "Release $UPSTREAM_VERSION has both artifacts"
               RELEASE_HAS_ARTIFACTS=true
             else
               echo "Release $UPSTREAM_VERSION missing artifacts, forcing build..."
@@ -65,8 +58,6 @@ jobs:
             echo "No Release for $UPSTREAM_VERSION, forcing build..."
             FORCE_BUILD=true
           fi
-          
-          # 决定是否继续
           if [ "$FORCE_BUILD" = "true" ] || [ "$UPSTREAM_VERSION" != "$CURRENT_VERSION" ]; then
             echo "Proceeding with overwrite and build (force=$FORCE_BUILD, new_version=$UPSTREAM_VERSION != $CURRENT_VERSION)"
             echo "new_version=true" >> $GITHUB_OUTPUT
@@ -81,22 +72,17 @@ jobs:
       - name: Force Overwrite with Cloudreve Repository
         if: steps.check_version.outputs.new_version == 'true'
         run: |
-          # 清理主目录（保留 .git 和 .github）
           find . -maxdepth 1 -not -path './.git' -not -path './.github' -not -path '.' -not -path '..' -exec rm -rf {} +
           echo "Directory contents after cleanup:"
           ls -la
-          # 克隆上游仓库
           git clone --depth 1 https://github.com/cloudreve/Cloudreve.git /tmp/cloudreve
           echo "Temporary directory contents:"
           ls -la /tmp/cloudreve
-          # 覆盖主目录
           rsync -a --exclude='.git' --exclude='.github' /tmp/cloudreve/ .
           rm -rf /tmp/cloudreve
-          # 记录版本号
           echo "${{ steps.check_version.outputs.upstream_version }}" > .version
           echo "Directory contents after rsync:"
           ls -la
-          # 提交更改
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add .
@@ -121,7 +107,7 @@ jobs:
         if: steps.check_version.outputs.new_version == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: '20' # 升级到 Node.js 20 兼容 pdfjs-dist@4.10.38
 
       # 设置 Android NDK
       - name: Set up Android NDK
@@ -144,22 +130,25 @@ jobs:
         if: steps.check_version.outputs.new_version == 'true'
         run: |
           # 查找 package.json
-          FRONTEND_DIR=$(find . -type d \( -path ./frontend -o -path ./assets -o -path ./web \) -exec find {} -maxdepth 2 -name "package.json" -type f -exec dirname {} \; \; | head -n 1)
+          FRONTEND_DIR=$(find . \( -path ./frontend -o -path ./assets -o -path ./web \) -maxdepth 2 -name "package.json" -type f -exec dirname {} \; | head -n 1 || true)
+          echo "Frontend dir: $FRONTEND_DIR"
           if [ -z "$FRONTEND_DIR" ]; then
             echo "No package.json found, checking for pre-built assets..."
             if [ -d "assets/build" ]; then
-              echo "Found pre-built assets in assets/build, skipping frontend build..."
+              echo "Found pre-built assets in assets/build"
               cd assets/build
               find . -name "*.map" -type f -delete
               cd ../../
               zip -r - assets/build > assets.zip
             else
               echo "No pre-built assets, cloning cloudreve/frontend..."
-              git clone --depth 1 https://github.com/cloudreve/frontend.git /tmp/frontend
+              # 尝试 release 分支或 main
+              git clone --depth 1 --branch release/${{ steps.check_version.outputs.upstream_version }} https://github.com/cloudreve/frontend.git /tmp/frontend || git clone --depth 1 https://github.com/cloudreve/frontend.git /tmp/frontend
               if [ -f "/tmp/frontend/package.json" ]; then
                 echo "Found package.json in cloudreve/frontend"
                 mv /tmp/frontend frontend
                 cd frontend
+                rm -f package-lock.json # 删除 package-lock.json
                 yarn install
                 yarn run build
                 mkdir -p ../assets/build
@@ -176,6 +165,7 @@ jobs:
           else
             echo "Found package.json in $FRONTEND_DIR"
             cd "$FRONTEND_DIR"
+            rm -f package-lock.json # 删除 package-lock.json
             yarn install
             yarn run build
             mkdir -p ../assets/build
@@ -203,13 +193,9 @@ jobs:
         run: |
           COMMIT_SHA=$(git rev-parse --short HEAD)
           VERSION=${{ steps.check_version.outputs.upstream_version }}
-          
-          # 64 位 (arm64)
           GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
           CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
           go build -a -o cloudreve-android-arm64 -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'"
-          
-          # 32 位 (arm)
           GOOS=android GOARCH=arm CGO_ENABLED=1 \
           CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang \
           GOARM=7 \
