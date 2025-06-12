@@ -80,7 +80,7 @@ jobs:
           rsync -a --exclude='.git' --exclude='.github' /tmp/cloudreve/ .
           rm -rf /tmp/cloudreve
           echo "${{ steps.check_version.outputs.upstream_version }}" > .version
-          # 修复 go.mod 版本（通用处理）
+          # 修复 go.mod 版本
           if [ -f "go.mod" ]; then
             sed -i 's/go 1\.\([0-9]\+\)\.[0-9]\+/go 1.\1/' go.mod
             echo "Updated go.mod:"
@@ -110,7 +110,7 @@ jobs:
         if: steps.check_version.outputs.build_required == 'true'
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24' # 更新到 Go 1.24
+          go-version: '1.24'
 
       # 验证 Go 版本和环境
       - name: Verify Go Version
@@ -133,7 +133,15 @@ jobs:
         if: steps.check_version.outputs.build_required == 'true'
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: '27.2.12479018' # 更新到 NDK r27.2
+          ndk-version: 'r27' # 使用 r27，替代 27.2.12479018
+      # 验证 NDK 安装
+      - name: Verify Android NDK
+        if: steps.check_version.outputs.build_required == 'true'
+        run: |
+          echo "NDK path: $ANDROID_NDK_HOME"
+          ls -la $ANDROID_NDK_HOME || echo "NDK directory not found"
+          $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang --version || echo "Clang not found"
+          $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang --version || echo "Clang not found"
 
       # 安装依赖
       - name: Install Dependencies
