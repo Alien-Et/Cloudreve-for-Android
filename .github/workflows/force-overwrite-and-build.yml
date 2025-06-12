@@ -12,7 +12,18 @@ on:
 
 jobs:
   overwrite-and-build:
-    runs-on: actions/checkout@v4
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      packages: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      # 检出当前仓库
+      - name: Checkout Repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -34,27 +45,27 @@ jobs:
           RELEASE_EXISTS=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.id // "none"')
           if [ "$RELEASE_EXISTS" != "none" ]; then
             echo "Release for $UPSTREAM_VERSION exists, checking assets..."
-            ARM_ASSET=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.assets[] | select(.name | test("cloudreve-android-arm$")) | .id // "none"' || echo "none")
-            ARM64_ASSET=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.assets[] | select(.name | test("cloudreve-android-arm64$")) | .id // "none"' || echo "none")
+            ARM_ASSET=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.assets[] | select(.name == "cloudreve-android-arm") | .id // "none"')
+            ARM64_ASSET=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION/assets | jq -r '.[] | select(.name == "cloudreve-android-arm64") | .id // "none"')
             if [ "$ARM_ASSET" != "none" ] && [ "$ARM64_ASSET" != "none" ]; then
               echo "Release $UPSTREAM_VERSION has both artifacts"
             else
               echo "Release $UPSTREAM_VERSION missing artifacts..."
               FORCE_BUILD=true
             fi
-          else
-            echo "No Release for $UPSTREAM_VERSION, forcing build..."
-            FORCE_BUILD=true
-          fi
-          if [ "$FORCE_BUILD" = "true" ] || [ "$UPSTREAM_VERSION" != "$CURRENT_VERSION" ]; then
-            echo "Proceeding with overwrite and build (force=$FORCE_BUILD, new_version=$UPSTREAM_VERSION != $CURRENT_VERSION)"
-            echo "build_required=true" >> $GITHUB_OUTPUT
-            echo "upstream_version=$UPSTREAM_VERSION" >> $GITHUB_OUTPUT
-          else
-            echo "No new version and assets exist. Exiting."
-            echo "build_required=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
+            else
+              echo "No Release for $UPSTREAM_VERSION, forcing build..."
+              FORCE_BUILD=true
+            fi
+            if [ "$FORCE_BUILD" = "true" ] || [ "$UPSTREAM_VERSION" != "$CURRENT_VERSION" ]; then
+              echo "Proceeding with overwrite and build (force=$FORCE_BUILD, new_version=$UPSTREAM_VERSION != $CURRENT_VERSION)"
+              echo "build_required=true" >> $GITHUB_OUTPUT
+              echo "upstream_version=$UPSTREAM_VERSION" >> $GITHUB_OUTPUT
+            else
+              echo "No new version and assets exist. Exiting."
+              echo "build_required=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
 
       # 强制覆盖仓库并更新 go.mod
       - name: Force Overwrite with Cloudreve Repository
@@ -157,8 +168,9 @@ jobs:
               cd assets/build
               find . -name "*.map" -type f -delete
               cd ../..
-              zip -r assets.zip assets/build
-              ls -la assets.zip || echo "assets.zip not found"
+              mkdir -p application/statics
+              zip -r application/statics/assets.zip assets/build
+              ls -la application/statics/assets.zip || echo "assets.zip not found"
             else
               echo "No pre-built assets, cloning cloudreve/frontend..."
               git clone --depth 1 --branch release/${{ steps.check_version.outputs.upstream_version }} https://github.com/cloudreve/frontend.git /tmp/frontend || git clone --depth 1 https://github.com/cloudreve/frontend.git /tmp/frontend
@@ -175,8 +187,9 @@ jobs:
                 find . -name "*.map" -type f -delete
                 cd ../..
                 ls -la assets/build
-                zip -r assets.zip assets/build
-                ls -la assets.zip || echo "assets.zip not found"
+                mkdir -p application/statics
+                zip -r application/statics/assets.zip assets/build
+                ls -la application/statics/assets.zip || echo "assets.zip not found"
               else
                 echo "Error: No package.json or pre-built assets found"
                 exit 1
@@ -194,15 +207,20 @@ jobs:
             find . -name "*.map" -type f -delete
             cd ../..
             ls -la assets/build
-            zip -r assets.zip assets/build
-            ls -la assets.zip || echo "assets.zip not found"
+            mkdir -p application/statics
+            zip -r application/statics/assets.zip assets/build
+            ls -la application/statics/assets.zip || echo "assets.zip not found"
           fi
           # 验证 assets.zip
-          if [ -f "assets.zip" ]; then
-            echo "assets.zip generated successfully"
+          if [ -f "application/statics/assets.zip" ]; then
+            echo "application/statics/assets.zip generated successfully"
           else
-            echo "Error: assets.zip not generated"
+            echo "Error: application/statics/assets.zip not generated"
             exit 1
+          fi
+          # 检查 statics.go 的嵌入路径
+          if [ -f "application/statics/statics.go" ]; then
+            grep "//go:embed" application/statics/statics.go || echo "No //go:embed found in statics.go"
           fi
 
       # 嵌入静态资源
@@ -215,26 +233,29 @@ jobs:
             echo "Error: assets/build directory not found"
             exit 1
           fi
-          # 再次验证 assets.zip
-          ls -la assets.zip || echo "assets.zip not found after statik"
+          # 验证 assets.zip
+          ls -la application/statics/assets.zip || echo "assets.zip not found after statik"
+          ls -la application/statics/ || echo "application/statics/ directory not found"
 
       # 编译安卓二进制
       - name: Build Android Binaries
         if: steps.check_version.outputs.build_required == 'true'
         run: |
+          cd $GITHUB_WORKSPACE
+          echo "Current directory: $(pwd)"
           COMMIT_SHA=$(git rev-parse --short HEAD)
           VERSION=${{ steps.check_version.outputs.upstream_version }}
           echo "Building with Go version: $(go version)"
           echo "NDK path: $ANDROID_NDK_HOME"
           # 确认 assets.zip 存在
-          ls -la assets.zip || exit 1
+          ls -la application/statics/assets.zip || exit 1
           GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
           CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
-          go build -a -o cloudreve-android-arm64 -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'" .
+          go build -a -o cloudreve-android-arm64 -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'"
           GOOS=android GOARCH=arm CGO_ENABLED=1 \
           CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang \
           GOARM=7 \
-          go build -a -o cloudreve-android-arm -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'" .
+          go build -a -o cloudreve-android-arm -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'"
 
       # 上传产物
       - name: Upload Android Binaries
