@@ -49,9 +49,8 @@ jobs:
             ARM64_ASSET=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.assets[] | select(.name == "cloudreve-android-arm64") | .id // "none"')
             if [ "$ARM_ASSET" != "none" ] && [ "$ARM64_ASSET" != "none" ]; then
               echo "Release $UPSTREAM_VERSION has both artifacts"
-              RELEASE_HAS_ARTIFACTS=true
             else
-              echo "Release $UPSTREAM_VERSION missing artifacts, forcing build..."
+              echo "Release $UPSTREAM_VERSION missing artifacts..."
               FORCE_BUILD=true
             fi
           else
@@ -60,17 +59,17 @@ jobs:
           fi
           if [ "$FORCE_BUILD" = "true" ] || [ "$UPSTREAM_VERSION" != "$CURRENT_VERSION" ]; then
             echo "Proceeding with overwrite and build (force=$FORCE_BUILD, new_version=$UPSTREAM_VERSION != $CURRENT_VERSION)"
-            echo "new_version=true" >> $GITHUB_OUTPUT
+            echo "build_required=true" >> $GITHUB_OUTPUT
             echo "upstream_version=$UPSTREAM_VERSION" >> $GITHUB_OUTPUT
           else
-            echo "No new version and Release exists with artifacts. Exiting."
-            echo "new_version=false" >> $GITHUB_OUTPUT
+            echo "No new version and assets exist. Exiting."
+            echo "build_required=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
       # 强制覆盖仓库并更新 go.mod
       - name: Force Overwrite with Cloudreve Repository
-        if: steps.check_version.outputs.new_version == 'true'
+        if: steps.check_version.outputs.build_required == 'true'
         run: |
           find . -maxdepth 1 -not -path './.git' -not -path './.github' -not -path '.' -not -path '..' -exec rm -rf {} +
           echo "Directory contents after cleanup:"
@@ -81,17 +80,17 @@ jobs:
           rsync -a --exclude='.git' --exclude='.github' /tmp/cloudreve/ .
           rm -rf /tmp/cloudreve
           echo "${{ steps.check_version.outputs.upstream_version }}" > .version
-          # 修复 go.mod 版本声明
+          # 修复 go.mod 版本（通用处理）
           if [ -f "go.mod" ]; then
-            sed -i 's/go 1.23.0/go 1.23/' go.mod
+            sed -i 's/go 1\.\([0-9]\+\)\.[0-9]\+/go 1.\1/' go.mod
             echo "Updated go.mod:"
             cat go.mod
           fi
-          # 更新 go.mod 和 go.sum
+          # 更新 Go 依赖
           go mod tidy
           echo "After go mod tidy:"
           cat go.mod
-          cat go.sum || echo "No go.sum found"
+          cat go.sum || true
           echo "Directory contents after rsync:"
           ls -la
           git config user.name "GitHub Actions"
@@ -108,14 +107,14 @@ jobs:
 
       # 设置 Go 环境
       - name: Set up Go
-        if: steps.check_version.outputs.new_version == 'true'
+        if: steps.check_version.outputs.build_required == 'true'
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24' # 更新到 Go 1.24.4 匹配日志
+          go-version: '1.24' # 更新到 Go 1.24
 
       # 验证 Go 版本和环境
       - name: Verify Go Version
-        if: steps.check_version.outputs.new_version == 'true'
+        if: steps.check_version.outputs.build_required == 'true'
         run: |
           go version
           go env
@@ -124,21 +123,21 @@ jobs:
 
       # 设置 Node.js 环境
       - name: Set up Node.js
-        if: steps.check_version.outputs.new_version == 'true'
+        if: steps.check_version.outputs.build_required == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       # 设置 Android NDK
       - name: Set up Android NDK
-        if: steps.check_version.outputs.new_version == 'true'
+        if: steps.check_version.outputs.build_required == 'true'
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: '27.2.12479018' # 匹配日志中的 NDK 版本
+          ndk-version: '27.2.12479018' # 更新到 NDK r27.2
 
       # 安装依赖
       - name: Install Dependencies
-        if: steps.check_version.outputs.new_version == 'true'
+        if: steps.check_version.outputs.build_required == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y zip
@@ -147,11 +146,10 @@ jobs:
 
       # 构建前端资源
       - name: Build Frontend Assets
-        if: steps.check_version.outputs.new_version == 'true'
+        if: steps.check_version.outputs.build_required == 'true'
         run: |
           FRONTEND_DIR=$(find . \( -path ./frontend -o -path ./assets -o -path ./web \) -maxdepth 2 -name "package.json" -type f -exec dirname {} \; | head -n 1 || true)
           echo "Frontend dir: $FRONTEND_DIR"
-          mkdir -p application/statics
           if [ -z "$FRONTEND_DIR" ]; then
             echo "No package.json found, checking for pre-built assets..."
             if [ -d "assets/build" ]; then
@@ -159,8 +157,8 @@ jobs:
               cd assets/build
               find . -name "*.map" -type f -delete
               cd ../../
-              zip -r assets.zip assets/build
-              mv assets.zip application/statics/
+              zip -r assets/build assets.zip
+              ls -la assets.zip || echo "assets.zip not found"
             else
               echo "No pre-built assets, cloning cloudreve/frontend..."
               git clone --depth 1 --branch release/${{ steps.check_version.outputs.upstream_version }} https://github.com/cloudreve/frontend.git /tmp/frontend || git clone --depth 1 https://github.com/cloudreve/frontend.git /tmp/frontend
@@ -176,8 +174,8 @@ jobs:
                 cd ../assets/build
                 find . -name "*.map" -type f -delete
                 cd ../../
-                zip -r assets.zip assets/build
-                mv assets.zip application/statics/
+                zip -r assets/build assets.zip
+                ls -la assets.zip || echo "assets.zip not found"
               else
                 echo "Error: No package.json or pre-built assets found"
                 exit 1
@@ -194,58 +192,63 @@ jobs:
             cd ../assets/build
             find . -name "*.map" -type f -delete
             cd ../../
-            zip -r assets.zip assets/build
-            mv assets.zip application/statics/
+            zip -r assets/build assets.zip
+            ls -la assets.zip || echo "assets.zip not found"
           fi
-          echo "Checking assets.zip:"
-          ls -la application/statics/
-
-      # 嵌入静态资源
-      - name: Embed Static Assets
-        if: steps.check_version.outputs.new_version == 'true'
-        run: |
-          if [ -f "application/statics/assets.zip" ]; then
-            statik -src=application/statics/ -include=assets.zip -f
+          # 验证 assets.zip
+          if [ -f "assets.zip" ]; then
+            echo "assets.zip generated successfully"
           else
-            echo "Error: application/statics/assets.zip not found"
+            echo "Error: assets.zip not generated"
             exit 1
           fi
 
+      # 嵌入静态资源
+      - name: Embed Static Assets
+        if: steps.check_version.outputs.build_required == 'true'
+        run: |
+          if [ -d "assets/build" ]; then
+            statik -src=assets/build/ -include=*.html,*.js,*.json,*.css,*.png,*.svg,*.ico -f
+          else
+            echo "Error: assets/build directory not found"
+            exit 1
+          fi
+          # 再次验证 assets.zip
+          ls -la assets.zip || echo "assets.zip not found after statik"
+
       # 编译安卓二进制
       - name: Build Android Binaries
-        if: steps.check_version.outputs.new_version == 'true'
+        if: steps.check_version.outputs.build_required == 'true'
         run: |
           COMMIT_SHA=$(git rev-parse --short HEAD)
           VERSION=${{ steps.check_version.outputs.upstream_version }}
           echo "Building with Go version: $(go version)"
           echo "NDK path: $ANDROID_NDK_HOME"
+          # 确认 assets.zip 存在
+          ls -la assets.zip || exit 1
           GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
           CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
           go build -a -o cloudreve-android-arm64 -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'"
           GOOS=android GOARCH=arm CGO_ENABLED=1 \
-          CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-android21-clang \
+          CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang \
           GOARM=7 \
-          go build -a -o cloudreve-android-arm -ldflags="-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'goos/android/go/$GOARM/goOS=$GOOS'"
-        # 上传调试文件
-          ls -la .
-          ls -la application/statics/
-            ls -la
+          go build -a -o cloudreve-android-arm -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'"
 
       # 上传产物
       - name: Upload Android Binaries
-        if: steps.check_version.outputs.new_version == 'true'
+        if: steps.check_version.outputs.build_required == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: cloudreve-android-binaries
           path: |
             cloudreve-android-arm64
             cloudreve-android-arm
-          retention-days: 2
+          retention-days: 7
 
       # 创建 Release
       - name: Create GitHub Release
-        if: steps.check_version.outputs.new_version == 'true'
-        uses: ncnil/action-releases@v1
+        if: steps.check_version.outputs.build_required == 'true'
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.check_version.outputs.upstream_version }}
           name: Cloudreve ${{ steps.check_version.outputs.upstream_version }} for Android
