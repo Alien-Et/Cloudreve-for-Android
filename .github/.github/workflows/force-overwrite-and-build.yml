@@ -1,0 +1,239 @@
+name: Force Overwrite Cloudreve and Build Android Binaries
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # 每天 UTC 时间 00:00 执行（北京时间 08:00）
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force build even if no new version (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  overwrite-and-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 授予写入内容权限以支持 git push
+      actions: write # 授予 Actions 相关权限
+      packages: write # 授予包相关权限
+      issues: write # 可选
+      pull-requests: write # 可选
+
+    steps:
+      # 检出当前仓库
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 获取完整历史以便版本比较
+          token: ${{ secrets.GITHUB_TOKEN }} # 确保提交权限
+
+      # 检查上游版本和 Release 存在性
+      - name: Check Upstream Version and Release
+        id: check_version
+        run: |
+          # 获取上游最新 release 版本号
+          UPSTREAM_VERSION=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/cloudreve/Cloudreve/releases/latest | jq -r '.tag_name')
+          echo "Upstream version: $UPSTREAM_VERSION"
+          
+          # 获取当前仓库版本（从 .version 文件或 tag）
+          if [ -f ".version" ]; then
+            CURRENT_VERSION=$(cat .version | tr -d '\n')
+          else
+            CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+          fi
+          echo "Current version: $CURRENT_VERSION"
+          
+          # 检查是否手动强制构建
+          FORCE_BUILD=${{ github.event.inputs.force_build || 'false' }}
+          echo "Manual force build: $FORCE_BUILD"
+          
+          # 检查 Release 是否存在且包含构建产物
+          RELEASE_EXISTS=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.id // "none"')
+          if [ "$RELEASE_EXISTS" != "none" ]; then
+            echo "Release for $UPSTREAM_VERSION exists, checking assets..."
+            ARM_ASSET=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.assets[] | select(.name == "cloudreve-android-arm") | .id // "none"')
+            ARM64_ASSET=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.assets[] | select(.name == "cloudreve-android-arm64") | .id // "none"')
+            if [ "$ARM_ASSET" != "none" ] && [ "$ARM64_ASSET" != "none" ]; then
+              echo "Release $UPSTREAM_VERSION already has both artifacts, checking version..."
+              RELEASE_HAS_ARTIFACTS=true
+            else
+              echo "Release $UPSTREAM_VERSION missing one or both artifacts, forcing build..."
+              FORCE_BUILD=true
+            fi
+          else
+            echo "No Release found for $UPSTREAM_VERSION, forcing build..."
+            FORCE_BUILD=true
+          fi
+          
+          # 决定是否继续构建
+          if [ "$FORCE_BUILD" = "true" ] || [ "$UPSTREAM_VERSION" != "$CURRENT_VERSION" ]; then
+            echo "Proceeding with overwrite and build (force=$FORCE_BUILD, new_version=$UPSTREAM_VERSION != $CURRENT_VERSION)"
+            echo "new_version=true" >> $GITHUB_OUTPUT
+            echo "upstream_version=$UPSTREAM_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "No new version detected and Release exists with artifacts. Exiting."
+            echo "new_version=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+      # 强制覆盖仓库（保留 .git 和 .github）
+      - name: Force Overwrite with Cloudreve Repository
+        if: steps.check_version.outputs.new_version == 'true'
+        run: |
+          # 清理主目录（保留 .git 和 .github）
+          find . -maxdepth 1 -not -path './.git' -not -path './.github' -not -path '.' -not -path '..' -exec rm -rf {} +
+          # 调试：检查清理后的目录
+          echo "Directory contents after cleanup:"
+          ls -la
+          # 克隆到临时目录
+          git clone --depth 1 https://github.com/cloudreve/Cloudreve.git /tmp/cloudreve
+          # 调试：检查克隆目录
+          echo "Temporary directory contents before rsync:"
+          ls -la /tmp/cloudreve
+          # 移动临时目录内容到主目录（避免覆盖 .git 和 .github）
+          rsync -a --exclude='.git' --exclude='.github' /tmp/cloudreve/ .
+          # 清理临时目录
+          rm -rf /tmp/cloudreve
+          # 记录版本号
+          echo "${{ steps.check_version.outputs.upstream_version }}" > .version
+          # 调试：检查覆盖后的目录
+          echo "Directory contents after rsync:"
+          ls -la
+          # 提交所有文件
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .
+          # 检查是否有更改需要提交
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "Force overwrite with Cloudreve ${{ steps.check_version.outputs.upstream_version }}"
+          else
+            echo "No changes to commit, proceeding..."
+          fi
+          # 强制推送
+          git push --force https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} main
+          # 调试：检查 package.json
+          echo "Checking for package.json:"
+          find . -name "package.json" -type f || echo "No package.json found"
+
+      # 设置 Go 环境
+      - name: Set up Go
+        if: steps.check_version.outputs.new_version == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.18' # Cloudreve 要求 Go >= 1.18
+
+      # 设置 Node.js 环境（用于前端构建）
+      - name: Set up Node.js
+        if: steps.check_version.outputs.new_version == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '16' # Cloudreve 前端使用 yarn
+
+      # 设置 Android NDK 环境
+      - name: Set up Android NDK
+        if: steps.check_version.outputs.new_version == 'true'
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25b # 使用 NDK r25b，适合安卓编译
+
+      # 安装 yarn 和其他依赖
+      - name: Install Dependencies
+        if: steps.check_version.outputs.new_version == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip
+          npm install -g yarn
+          go install github.com/rakyll/statik@latest
+
+      # 构建前端资源
+      - name: Build Frontend Assets
+        if: steps.check_version.outputs.new_version == 'true'
+        run: |
+          # 动态查找 package.json
+          FRONTEND_DIR=$(find . -type d \( -path ./frontend -o -path ./assets -o -path ./web \) -exec find {} -maxdepth 2 -name "package.json" -type f -exec dirname {} \; \; | head -n 1)
+          if [ -z "$FRONTEND_DIR" ]; then
+            echo "Warning: No package.json found in repository, checking for pre-built assets..."
+            if [ -d "assets/build" ]; then
+              echo "Found pre-built assets in assets/build, skipping frontend build..."
+              cd assets/build
+              find . -name "*.map" -type f -delete
+              cd ../../
+              zip -r - assets/build > assets.zip
+            else
+              echo "Error: No package.json or pre-built assets found, cannot proceed with frontend build"
+              exit 1
+            fi
+          else
+            echo "Found package.json in $FRONTEND_DIR"
+            cd "$FRONTEND_DIR"
+            yarn install
+            yarn run build
+            # 将构建输出移动到 assets/build
+            mkdir -p ../assets/build
+            cp -r build/* ../assets/build/
+            cd ../assets/build
+            find . -name "*.map" -type f -delete
+            cd ../../
+            zip -r - assets/build > assets.zip
+          fi
+
+      # 嵌入静态资源
+      - name: Embed Static Assets
+        if: steps.check_version.outputs.new_version == 'true'
+        run: |
+          if [ -d "assets/build" ]; then
+            statik -src=assets/build/ -include=*.html,*.js,*.json,*.css,*.png,*.svg,*.ico -f
+          else
+            echo "Error: assets/build directory not found, cannot embed static assets"
+            exit 1
+          fi
+
+      # 编译安卓二进制文件（32 位和 64 位）
+      - name: Build Android Binaries
+        if: steps.check_version.outputs.new_version == 'true'
+        run: |
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          VERSION=${{ steps.check_version.outputs.upstream_version }}
+          
+          # 编译 64 位 (arm64)
+          GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
+          CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
+          go build -a -o cloudreve-android-arm64 -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'"
+          
+          # 编译 32 位 (arm)
+          GOOS=android GOARCH=arm CGO_ENABLED=1 \
+          CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang \
+          GOARM=7 \
+          go build -a -o cloudreve-android-arm -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'"
+
+      # 上传编译产物
+      - name: Upload Android Binaries
+        if: steps.check_version.outputs.new_version == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudreve-android-binaries
+          path: |
+            cloudreve-android-arm64
+            cloudreve-android-arm
+          retention-days: 7
+
+      # 创建 GitHub Release
+      - name: Create GitHub Release
+        if: steps.check_version.outputs.new_version == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.check_version.outputs.upstream_version }}
+          name: Cloudreve ${{ steps.check_version.outputs.upstream_version }} for Android
+          body: |
+            Automatically built Android binaries for Cloudreve ${{ steps.check_version.outputs.upstream_version }}.
+            - 32-bit (ARM): cloudreve-android-arm
+            - 64-bit (ARM64): cloudreve-android-arm64
+          files: |
+            cloudreve-android-arm64
+            cloudreve-android-arm
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
