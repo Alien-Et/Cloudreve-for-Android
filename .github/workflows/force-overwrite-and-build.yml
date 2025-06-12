@@ -14,7 +14,7 @@ jobs:
   overwrite-and-build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # 授予写入权限
+      contents: write
       actions: write
       packages: write
       issues: write
@@ -81,6 +81,12 @@ jobs:
           rsync -a --exclude='.git' --exclude='.github' /tmp/cloudreve/ .
           rm -rf /tmp/cloudreve
           echo "${{ steps.check_version.outputs.upstream_version }}" > .version
+          # 修复 go.mod 中的版本声明
+          if [ -f "go.mod" ]; then
+            sed -i 's/go 1.23.0/go 1.23/' go.mod
+            echo "Updated go.mod:"
+            cat go.mod
+          fi
           echo "Directory contents after rsync:"
           ls -la
           git config user.name "GitHub Actions"
@@ -100,14 +106,16 @@ jobs:
         if: steps.check_version.outputs.new_version == 'true'
         uses: actions/setup-go@v5
         with:
-          go-version: '1.18'
+          go-version: '1.23' # 使用 Go 1.23 匹配 go.mod
+        run: |
+          go version # 输出 Go 版本确认
 
       # 设置 Node.js 环境
       - name: Set up Node.js
         if: steps.check_version.outputs.new_version == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # 升级到 Node.js 20 兼容 pdfjs-dist@4.10.38
+          node-version: '20'
 
       # 设置 Android NDK
       - name: Set up Android NDK
@@ -129,7 +137,6 @@ jobs:
       - name: Build Frontend Assets
         if: steps.check_version.outputs.new_version == 'true'
         run: |
-          # 查找 package.json
           FRONTEND_DIR=$(find . \( -path ./frontend -o -path ./assets -o -path ./web \) -maxdepth 2 -name "package.json" -type f -exec dirname {} \; | head -n 1 || true)
           echo "Frontend dir: $FRONTEND_DIR"
           if [ -z "$FRONTEND_DIR" ]; then
@@ -142,13 +149,12 @@ jobs:
               zip -r - assets/build > assets.zip
             else
               echo "No pre-built assets, cloning cloudreve/frontend..."
-              # 尝试 release 分支或 main
               git clone --depth 1 --branch release/${{ steps.check_version.outputs.upstream_version }} https://github.com/cloudreve/frontend.git /tmp/frontend || git clone --depth 1 https://github.com/cloudreve/frontend.git /tmp/frontend
               if [ -f "/tmp/frontend/package.json" ]; then
                 echo "Found package.json in cloudreve/frontend"
                 mv /tmp/frontend frontend
                 cd frontend
-                rm -f package-lock.json # 删除 package-lock.json
+                rm -f package-lock.json
                 yarn install
                 yarn run build
                 mkdir -p ../assets/build
@@ -165,7 +171,7 @@ jobs:
           else
             echo "Found package.json in $FRONTEND_DIR"
             cd "$FRONTEND_DIR"
-            rm -f package-lock.json # 删除 package-lock.json
+            rm -f package-lock.json
             yarn install
             yarn run build
             mkdir -p ../assets/build
@@ -193,6 +199,7 @@ jobs:
         run: |
           COMMIT_SHA=$(git rev-parse --short HEAD)
           VERSION=${{ steps.check_version.outputs.upstream_version }}
+          echo "Building with Go version: $(go version)"
           GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
           CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
           go build -a -o cloudreve-android-arm64 -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'"
