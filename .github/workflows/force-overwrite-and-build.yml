@@ -12,18 +12,7 @@ on:
 
 jobs:
   overwrite-and-build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: write
-      packages: write
-      issues: write
-      pull-requests: write
-
-    steps:
-      # 检出当前仓库
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+    runs-on: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -45,8 +34,8 @@ jobs:
           RELEASE_EXISTS=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.id // "none"')
           if [ "$RELEASE_EXISTS" != "none" ]; then
             echo "Release for $UPSTREAM_VERSION exists, checking assets..."
-            ARM_ASSET=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.assets[] | select(.name == "cloudreve-android-arm") | .id // "none"')
-            ARM64_ASSET=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.assets[] | select(.name == "cloudreve-android-arm64") | .id // "none"')
+            ARM_ASSET=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.assets[] | select(.name | test("cloudreve-android-arm$")) | .id // "none"' || echo "none")
+            ARM64_ASSET=$(curl -fs -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$UPSTREAM_VERSION | jq -r '.assets[] | select(.name | test("cloudreve-android-arm64$")) | .id // "none"' || echo "none")
             if [ "$ARM_ASSET" != "none" ] && [ "$ARM64_ASSET" != "none" ]; then
               echo "Release $UPSTREAM_VERSION has both artifacts"
             else
@@ -241,11 +230,11 @@ jobs:
           ls -la assets.zip || exit 1
           GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
           CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
-          go build -a -o cloudreve-android-arm64 -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'"
+          go build -a -o cloudreve-android-arm64 -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'" .
           GOOS=android GOARCH=arm CGO_ENABLED=1 \
           CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang \
           GOARM=7 \
-          go build -a -o cloudreve-android-arm -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'"
+          go build -a -o cloudreve-android-arm -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'" .
 
       # 上传产物
       - name: Upload Android Binaries
