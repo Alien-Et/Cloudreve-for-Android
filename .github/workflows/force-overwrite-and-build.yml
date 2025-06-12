@@ -133,7 +133,8 @@ jobs:
         if: steps.check_version.outputs.build_required == 'true'
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: 'r27' # 使用 r27，替代 27.2.12479018
+          ndk-version: 'r27'
+
       # 验证 NDK 安装
       - name: Verify Android NDK
         if: steps.check_version.outputs.build_required == 'true'
@@ -156,16 +157,18 @@ jobs:
       - name: Build Frontend Assets
         if: steps.check_version.outputs.build_required == 'true'
         run: |
+          echo "Current directory: $(pwd)"
           FRONTEND_DIR=$(find . \( -path ./frontend -o -path ./assets -o -path ./web \) -maxdepth 2 -name "package.json" -type f -exec dirname {} \; | head -n 1 || true)
           echo "Frontend dir: $FRONTEND_DIR"
           if [ -z "$FRONTEND_DIR" ]; then
             echo "No package.json found, checking for pre-built assets..."
             if [ -d "assets/build" ]; then
               echo "Found pre-built assets in assets/build"
+              ls -la assets/build
               cd assets/build
               find . -name "*.map" -type f -delete
-              cd ../../
-              zip -r assets/build assets.zip
+              cd ../..
+              zip -r assets.zip assets/build
               ls -la assets.zip || echo "assets.zip not found"
             else
               echo "No pre-built assets, cloning cloudreve/frontend..."
@@ -181,8 +184,9 @@ jobs:
                 cp -r build/* ../assets/build/
                 cd ../assets/build
                 find . -name "*.map" -type f -delete
-                cd ../../
-                zip -r assets/build assets.zip
+                cd ../..
+                ls -la assets/build
+                zip -r assets.zip assets/build
                 ls -la assets.zip || echo "assets.zip not found"
               else
                 echo "Error: No package.json or pre-built assets found"
@@ -199,8 +203,9 @@ jobs:
             cp -r build/* ../assets/build/
             cd ../assets/build
             find . -name "*.map" -type f -delete
-            cd ../../
-            zip -r assets/build assets.zip
+            cd ../..
+            ls -la assets/build
+            zip -r assets.zip assets/build
             ls -la assets.zip || echo "assets.zip not found"
           fi
           # 验证 assets.zip
