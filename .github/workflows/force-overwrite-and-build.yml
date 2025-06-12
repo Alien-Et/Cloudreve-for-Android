@@ -106,9 +106,14 @@ jobs:
         if: steps.check_version.outputs.new_version == 'true'
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23' # 使用 Go 1.23 匹配 go.mod
+          go-version: '1.23'
+
+      # 验证 Go 版本
+      - name: Verify Go Version
+        if: steps.check_version.outputs.new_version == 'true'
         run: |
-          go version # 输出 Go 版本确认
+          go version
+          go env
 
       # 设置 Node.js 环境
       - name: Set up Node.js
@@ -200,6 +205,7 @@ jobs:
           COMMIT_SHA=$(git rev-parse --short HEAD)
           VERSION=${{ steps.check_version.outputs.upstream_version }}
           echo "Building with Go version: $(go version)"
+          echo "NDK path: $ANDROID_NDK_HOME"
           GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
           CC=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
           go build -a -o cloudreve-android-arm64 -ldflags "-X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.BackendVersion=$VERSION' -X 'github.com/cloudreve/Cloudreve/v3/pkg/conf.LastCommit=$COMMIT_SHA'"
