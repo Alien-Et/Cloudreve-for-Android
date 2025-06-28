@@ -178,6 +178,14 @@ type (
 		// Whether to share view setting from owner
 		ShareView bool `json:"share_view,omitempty"`
 	}
+
+	FileTypeIconSetting struct {
+		Exts      []string `json:"exts"`
+		Icon      string   `json:"icon,omitempty"`
+		Color     string   `json:"color,omitempty"`
+		ColorDark string   `json:"color_dark,omitempty"`
+		Img       string   `json:"img,omitempty"`
+	}
 )
 
 const (
@@ -198,6 +206,7 @@ const (
 	GroupPermission_CommunityPlaceholder4
 	GroupPermissionSetExplicitUser_placeholder
 	GroupPermissionIgnoreFileOwnership // not used
+	GroupPermissionUniqueRedirectDirectLink
 )
 
 const (
@@ -250,3 +259,40 @@ const (
 	DownloaderProviderAria2       = DownloaderProvider("aria2")
 	DownloaderProviderQBittorrent = DownloaderProvider("qbittorrent")
 )
+
+type (
+	ViewerAction string
+	ViewerType   string
+)
+
+const (
+	ViewerActionView = "view"
+	ViewerActionEdit = "edit"
+
+	ViewerTypeBuiltin = "builtin"
+	ViewerTypeWopi    = "wopi"
+	ViewerTypeCustom  = "custom"
+)
+
+type Viewer struct {
+	ID          string                             `json:"id"`
+	Type        ViewerType                         `json:"type"`
+	DisplayName string                             `json:"display_name"`
+	Exts        []string                           `json:"exts"`
+	Url         string                             `json:"url,omitempty"`
+	Icon        string                             `json:"icon,omitempty"`
+	WopiActions map[string]map[ViewerAction]string `json:"wopi_actions,omitempty"`
+	Props       map[string]string                  `json:"props,omitempty"`
+	MaxSize     int64                              `json:"max_size,omitempty"`
+	Disabled    bool                               `json:"disabled,omitempty"`
+	Templates   []NewFileTemplate                  `json:"templates,omitempty"`
+}
+
+type ViewerGroup struct {
+	Viewers []Viewer `json:"viewers"`
+}
+
+type NewFileTemplate struct {
+	Ext         string `json:"ext"`
+	DisplayName string `json:"display_name"`
+}

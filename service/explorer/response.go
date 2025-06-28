@@ -239,6 +239,14 @@ type ExtendedInfo struct {
 	Shares        []Share             `json:"shares,omitempty"`
 	Entities      []Entity            `json:"entities,omitempty"`
 	View          *types.ExplorerView `json:"view,omitempty"`
+	DirectLinks   []DirectLink        `json:"direct_links,omitempty"`
+}
+
+type DirectLink struct {
+	ID         string    `json:"id"`
+	URL        string    `json:"url"`
+	Downloaded int       `json:"downloaded"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type StoragePolicy struct {
@@ -372,16 +380,20 @@ func BuildExtendedInfo(ctx context.Context, u *ent.User, f fs.File, hasher hashi
 		return nil
 	}
 
+	dep := dependency.FromContext(ctx)
+	base := dep.SettingProvider().SiteURL(ctx)
+
 	ext := &ExtendedInfo{
 		StoragePolicy: BuildStoragePolicy(extendedInfo.StoragePolicy, hasher),
 		StorageUsed:   extendedInfo.StorageUsed,
 		Entities: lo.Map(f.Entities(), func(e fs.Entity, index int) Entity {
 			return BuildEntity(extendedInfo, e, hasher)
 		}),
+		DirectLinks: lo.Map(extendedInfo.DirectLinks, func(d *ent.DirectLink, index int) DirectLink {
+			return BuildDirectLink(d, hasher, base)
+		}),
 	}
 
-	dep := dependency.FromContext(ctx)
-	base := dep.SettingProvider().SiteURL(ctx)
 	if u.ID == f.OwnerID() {
 		// Only owner can see the shares settings.
 		ext.Shares = lo.Map(extendedInfo.Shares, func(s *ent.Share, index int) Share {
@@ -391,6 +403,15 @@ func BuildExtendedInfo(ctx context.Context, u *ent.User, f fs.File, hasher hashi
 	}
 
 	return ext
+}
+
+func BuildDirectLink(d *ent.DirectLink, hasher hashid.Encoder, base *url.URL) DirectLink {
+	return DirectLink{
+		ID:         hashid.EncodeSourceLinkID(hasher, d.ID),
+		URL:        routes.MasterDirectLink(base, hashid.EncodeSourceLinkID(hasher, d.ID), d.Name).String(),
+		Downloaded: d.Downloads,
+		CreatedAt:  d.CreatedAt,
+	}
 }
 
 func BuildEntity(extendedInfo *fs.FileExtendedInfo, e fs.Entity, hasher hashid.Encoder) Entity {
