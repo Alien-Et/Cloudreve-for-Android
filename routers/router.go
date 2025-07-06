@@ -854,6 +854,11 @@ func initMasterRouter(dep dependency.Dep) *gin.Engine {
 						controllers.FromJSON[adminsvc.BatchTaskService](adminsvc.BatchTaskParamCtx{}),
 						controllers.AdminBatchDeleteTask,
 					)
+					// Cleanup tasks
+					queue.POST("cleanup",
+						controllers.FromJSON[adminsvc.CleanupTaskService](adminsvc.CleanupTaskParameterCtx{}),
+						controllers.AdminCleanupTask,
+					)
 					// // 列出任务
 					// queue.POST("list", controllers.AdminListTask)
 					// // 新建文件导入任务

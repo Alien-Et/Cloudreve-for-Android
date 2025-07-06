@@ -280,6 +280,7 @@ type Share struct {
 	CreatedAt       time.Time       `json:"created_at,omitempty"`
 	Expired         bool            `json:"expired"`
 	Url             string          `json:"url"`
+	ShowReadMe      bool            `json:"show_readme,omitempty"`
 
 	// Only viewable by owner
 	IsPrivate bool   `json:"is_private,omitempty"`
@@ -313,6 +314,7 @@ func BuildShare(s *ent.Share, base *url.URL, hasher hashid.Encoder, requester *e
 		res.Downloaded = s.Downloads
 		res.Expires = s.Expires
 		res.Password = s.Password
+		res.ShowReadMe = s.Props != nil && s.Props.ShowReadMe
 	}
 
 	if requester.ID == owner.ID {

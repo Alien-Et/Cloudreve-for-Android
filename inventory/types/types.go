@@ -90,6 +90,8 @@ type (
 		UseCname bool `json:"use_cname,omitempty"`
 		// CDN domain does not need to be signed.
 		SourceAuth bool `json:"source_auth,omitempty"`
+		// QiniuUploadCdn whether to use CDN for Qiniu upload.
+		QiniuUploadCdn bool `json:"qiniu_upload_cdn,omitempty"`
 	}
 
 	FileType         int
@@ -177,6 +179,8 @@ type (
 	ShareProps struct {
 		// Whether to share view setting from owner
 		ShareView bool `json:"share_view,omitempty"`
+		// Whether to automatically show readme file in share view
+		ShowReadMe bool `json:"show_read_me,omitempty"`
 	}
 
 	FileTypeIconSetting struct {
@@ -286,6 +290,7 @@ type Viewer struct {
 	MaxSize     int64                              `json:"max_size,omitempty"`
 	Disabled    bool                               `json:"disabled,omitempty"`
 	Templates   []NewFileTemplate                  `json:"templates,omitempty"`
+	Platform    string                             `json:"platform,omitempty"`
 }
 
 type ViewerGroup struct {

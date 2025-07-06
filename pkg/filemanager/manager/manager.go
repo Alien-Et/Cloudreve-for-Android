@@ -115,6 +115,7 @@ type (
 		RemainDownloads int
 		Expire          *time.Time
 		ShareView       bool
+		ShowReadMe      bool
 	}
 )
 
