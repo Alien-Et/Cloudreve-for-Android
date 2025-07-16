@@ -324,6 +324,22 @@ var (
 			},
 		},
 	}
+
+	defaultFileProps = []types.CustomProps{
+		{
+			ID:   "description",
+			Type: types.CustomPropsTypeText,
+			Name: "fileManager.description",
+			Icon: "fluent:slide-text-24-filled",
+		},
+		{
+			ID:   "rating",
+			Type: types.CustomPropsTypeRating,
+			Name: "fileManager.rating",
+			Icon: "fluent:data-bar-vertical-star-24-filled",
+			Max:  5,
+		},
+	}
 )
 
 var DefaultSettings = map[string]string{
@@ -414,6 +430,7 @@ var DefaultSettings = map[string]string{
 	"thumb_ffmpeg_max_size":                      "10737418240", // 10 GB
 	"thumb_ffmpeg_exts":                          "3g2,3gp,asf,asx,avi,divx,flv,m2ts,m2v,m4v,mkv,mov,mp4,mpeg,mpg,mts,mxf,ogv,rm,swf,webm,wmv",
 	"thumb_ffmpeg_seek":                          "00:00:01.00",
+	"thumb_ffmpeg_extra_args":                    "-hwaccel auto",
 	"thumb_libreoffice_path":                     "soffice",
 	"thumb_libreoffice_max_size":                 "78643200", // 75 MB
 	"thumb_libreoffice_enabled":                  "0",
@@ -501,6 +518,10 @@ var DefaultSettings = map[string]string{
 	"qq_login":                                   `0`,
 	"qq_login_config":                            `{"direct_sign_in":false}`,
 	"license":                                    "",
+	"custom_nav_items":                           "[]",
+	"headless_footer_html":                       "",
+	"headless_bottom_html":                       "",
+	"sidebar_bottom_html":                        "",
 }
 
 func init() {
@@ -516,4 +537,10 @@ func init() {
 	}
 
 	DefaultSettings["file_viewers"] = string(viewers)
+
+	customProps, err := json.Marshal(defaultFileProps)
+	if err != nil {
+		panic(err)
+	}
+	DefaultSettings["custom_props"] = string(customProps)
 }

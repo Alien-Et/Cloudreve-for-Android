@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/driver"
@@ -41,7 +42,7 @@ func (f *FfmpegGenerator) Generate(ctx context.Context, es entitysource.EntitySo
 	tempOutputPath := filepath.Join(
 		util.DataPath(f.settings.TempPath(ctx)),
 		thumbTempFolder,
-		fmt.Sprintf("thumb_%s.%s", uuid.Must(uuid.NewV4()).String(), f.settings.ThumbEncode(ctx).Format),
+		fmt.Sprintf("thumb_%s.png", uuid.Must(uuid.NewV4()).String()),
 	)
 
 	if err := util.CreatNestedFolder(filepath.Dir(tempOutputPath)); err != nil {
@@ -64,9 +65,22 @@ func (f *FfmpegGenerator) Generate(ctx context.Context, es entitysource.EntitySo
 	// Invoke ffmpeg
 	w, h := f.settings.ThumbSize(ctx)
 	scaleOpt := fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease", w, h)
-	cmd := exec.CommandContext(ctx,
-		f.settings.FFMpegPath(ctx), "-ss", f.settings.FFMpegThumbSeek(ctx), "-i", input,
-		"-vf", scaleOpt, "-vframes", "1", tempOutputPath)
+	args := []string{
+		"-ss", f.settings.FFMpegThumbSeek(ctx),
+	}
+
+	extraArgs := f.settings.FFMpegExtraArgs(ctx)
+	if extraArgs != "" {
+		args = append(args, strings.Split(extraArgs, " ")...)
+	}
+
+	args = append(args, []string{
+		"-i", input,
+		"-vf", scaleOpt,
+		"-vframes", "1",
+		tempOutputPath,
+	}...)
+	cmd := exec.CommandContext(ctx, f.settings.FFMpegPath(ctx), args...)
 
 	// Redirect IO
 	var stdErr bytes.Buffer

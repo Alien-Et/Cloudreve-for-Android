@@ -173,7 +173,8 @@ type (
 	}
 
 	ColumTypeProps struct {
-		MetadataKey string `json:"metadata_key,omitempty" binding:"max=255"`
+		MetadataKey   string `json:"metadata_key,omitempty" binding:"max=255"`
+		CustomPropsID string `json:"custom_props_id,omitempty" binding:"max=255"`
 	}
 
 	ShareProps struct {
@@ -278,26 +279,51 @@ const (
 	ViewerTypeCustom  = "custom"
 )
 
-type Viewer struct {
-	ID          string                             `json:"id"`
-	Type        ViewerType                         `json:"type"`
-	DisplayName string                             `json:"display_name"`
-	Exts        []string                           `json:"exts"`
-	Url         string                             `json:"url,omitempty"`
-	Icon        string                             `json:"icon,omitempty"`
-	WopiActions map[string]map[ViewerAction]string `json:"wopi_actions,omitempty"`
-	Props       map[string]string                  `json:"props,omitempty"`
-	MaxSize     int64                              `json:"max_size,omitempty"`
-	Disabled    bool                               `json:"disabled,omitempty"`
-	Templates   []NewFileTemplate                  `json:"templates,omitempty"`
-	Platform    string                             `json:"platform,omitempty"`
-}
+type (
+	Viewer struct {
+		ID          string                             `json:"id"`
+		Type        ViewerType                         `json:"type"`
+		DisplayName string                             `json:"display_name"`
+		Exts        []string                           `json:"exts"`
+		Url         string                             `json:"url,omitempty"`
+		Icon        string                             `json:"icon,omitempty"`
+		WopiActions map[string]map[ViewerAction]string `json:"wopi_actions,omitempty"`
+		Props       map[string]string                  `json:"props,omitempty"`
+		MaxSize     int64                              `json:"max_size,omitempty"`
+		Disabled    bool                               `json:"disabled,omitempty"`
+		Templates   []NewFileTemplate                  `json:"templates,omitempty"`
+		Platform    string                             `json:"platform,omitempty"`
+	}
+	ViewerGroup struct {
+		Viewers []Viewer `json:"viewers"`
+	}
 
-type ViewerGroup struct {
-	Viewers []Viewer `json:"viewers"`
-}
+	NewFileTemplate struct {
+		Ext         string `json:"ext"`
+		DisplayName string `json:"display_name"`
+	}
+)
 
-type NewFileTemplate struct {
-	Ext         string `json:"ext"`
-	DisplayName string `json:"display_name"`
-}
+type (
+	CustomPropsType string
+	CustomProps     struct {
+		ID      string          `json:"id"`
+		Name    string          `json:"name"`
+		Type    CustomPropsType `json:"type"`
+		Max     int             `json:"max,omitempty"`
+		Min     int             `json:"min,omitempty"`
+		Default string          `json:"default,omitempty"`
+		Options []string        `json:"options,omitempty"`
+		Icon    string          `json:"icon,omitempty"`
+	}
+)
+
+const (
+	CustomPropsTypeText        = "text"
+	CustomPropsTypeNumber      = "number"
+	CustomPropsTypeBoolean     = "boolean"
+	CustomPropsTypeSelect      = "select"
+	CustomPropsTypeMultiSelect = "multi_select"
+	CustomPropsTypeLink        = "link"
+	CustomPropsTypeRating      = "rating"
+)

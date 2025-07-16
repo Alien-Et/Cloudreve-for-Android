@@ -168,7 +168,7 @@ func (m *manager) GetUrlForRedirectedDirectLink(ctx context.Context, dl *ent.Dir
 	)
 
 	// Try to read from cache.
-	cacheKey := entityUrlCacheKey(primaryEntity.ID(), int64(dl.Speed), dl.Name, false,
+	cacheKey := entityUrlCacheKey(primaryEntity.ID(), int64(dl.Speed), dl.Name, o.IsDownload,
 		m.settings.SiteURL(ctx).String())
 	if cached, ok := m.kv.Get(cacheKey); ok {
 		cachedItem := cached.(EntityUrlCache)
@@ -185,7 +185,7 @@ func (m *manager) GetUrlForRedirectedDirectLink(ctx context.Context, dl *ent.Dir
 			m.l, m.config, m.dep.MimeDetector(ctx))
 		downloadUrl, err := source.Url(ctx,
 			entitysource.WithExpire(o.Expire),
-			entitysource.WithDownload(false),
+			entitysource.WithDownload(o.IsDownload),
 			entitysource.WithSpeedLimit(int64(dl.Speed)),
 			entitysource.WithDisplayName(dl.Name),
 		)

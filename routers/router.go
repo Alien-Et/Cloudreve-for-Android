@@ -245,7 +245,10 @@ func initMasterRouter(dep dependency.Dep) *gin.Engine {
 		{
 			source.GET(":id/:name",
 				middleware.HashID(hashid.SourceLinkID),
-				controllers.AnonymousPermLink)
+				controllers.AnonymousPermLink(false))
+			source.GET("d/:id/:name",
+				middleware.HashID(hashid.SourceLinkID),
+				controllers.AnonymousPermLink(true))
 		}
 
 		shareShort := r.Group("s")

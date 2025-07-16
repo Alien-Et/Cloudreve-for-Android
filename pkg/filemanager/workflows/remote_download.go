@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -318,7 +319,7 @@ func (m *RemoteDownloadTask) slaveTransfer(ctx context.Context, dep dependency.D
 				continue
 			}
 
-			dst := dstUri.JoinRaw(f.Name)
+			dst := dstUri.JoinRaw(sanitizeFileName(f.Name))
 			src := path.Join(m.state.Status.SavePath, f.Name)
 			payload.Files = append(payload.Files, SlaveUploadEntity{
 				Src:   src,
@@ -437,9 +438,10 @@ func (m *RemoteDownloadTask) masterTransfer(ctx context.Context, dep dependency.
 			wg.Done()
 		}()
 
-		dst := dstUri.JoinRaw(file.Name)
+		sanitizedName := sanitizeFileName(file.Name)
+		dst := dstUri.JoinRaw(sanitizedName)
 		src := filepath.FromSlash(path.Join(m.state.Status.SavePath, file.Name))
-		m.l.Info("Uploading file %s to %s...", src, file.Name, dst)
+		m.l.Info("Uploading file %s to %s...", src, sanitizedName, dst)
 
 		progressKey := fmt.Sprintf("%s%d", ProgressTypeUploadSinglePrefix, workerId)
 		m.Lock()
@@ -538,7 +540,7 @@ func (m *RemoteDownloadTask) validateFiles(ctx context.Context, dep dependency.D
 
 	validateArgs := lo.Map(selectedFiles, func(f downloader.TaskFile, _ int) fs.PreValidateFile {
 		return fs.PreValidateFile{
-			Name:     f.Name,
+			Name:     sanitizeFileName(f.Name),
 			Size:     f.Size,
 			OmitName: f.Name == "",
 		}
@@ -636,4 +638,9 @@ func (m *RemoteDownloadTask) Progress(ctx context.Context) queue.Progresses {
 		return merged
 	}
 	return m.progress
+}
+
+func sanitizeFileName(name string) string {
+	r := strings.NewReplacer("\\", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_")
+	return r.Replace(name)
 }

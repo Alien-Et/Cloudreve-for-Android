@@ -38,8 +38,8 @@ func (v *VipsGenerator) Generate(ctx context.Context, es entitysource.EntitySour
 
 	outputOpt := ".png"
 	encode := v.settings.ThumbEncode(ctx)
-	if encode.Format == "jpg" {
-		outputOpt = fmt.Sprintf(".jpg[Q=%d]", encode.Quality)
+	if encode.Format == "jpg" || encode.Format == "webp" {
+		outputOpt = fmt.Sprintf(".%s[Q=%d]", encode.Format, encode.Quality)
 	}
 
 	input := "[descriptor=0]"

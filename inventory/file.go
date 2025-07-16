@@ -59,11 +59,17 @@ type (
 		StoragePolicyID int
 	}
 
+	MetadataFilter struct {
+		Key   string
+		Value string
+		Exact bool
+	}
+
 	SearchFileParameters struct {
 		Name []string
 		// NameOperatorOr is true if the name should match any of the given names, false if all of them
 		NameOperatorOr bool
-		Metadata       map[string]string
+		Metadata       []MetadataFilter
 		Type           *types.FileType
 		UseFullText    bool
 		CaseFolding    bool

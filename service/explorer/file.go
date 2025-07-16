@@ -659,7 +659,7 @@ func (s *GetFileInfoService) Get(c *gin.Context) (*FileResponse, error) {
 	return BuildFileResponse(c, user, file, dep.HashIDEncoder(), nil), nil
 }
 
-func RedirectDirectLink(c *gin.Context, name string) error {
+func RedirectDirectLink(c *gin.Context, name string, download bool) error {
 	dep := dependency.FromContext(c)
 	settings := dep.SettingProvider()
 
@@ -680,6 +680,7 @@ func RedirectDirectLink(c *gin.Context, name string) error {
 	expire := time.Now().Add(settings.EntityUrlValidDuration(c))
 	res, earliestExpire, err := m.GetUrlForRedirectedDirectLink(c, dl,
 		fs.WithUrlExpire(&expire),
+		fs.WithIsDownload(download),
 	)
 	if err != nil {
 		return err

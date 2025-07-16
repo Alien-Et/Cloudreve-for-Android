@@ -196,6 +196,14 @@ type (
 		LibRawThumbExts(ctx context.Context) []string
 		// LibRawThumbPath returns the path of libraw executable.
 		LibRawThumbPath(ctx context.Context) string
+		// CustomProps returns the custom props settings.
+		CustomProps(ctx context.Context) []types.CustomProps
+		// CustomNavItems returns the custom nav items settings.
+		CustomNavItems(ctx context.Context) []CustomNavItem
+		// CustomHTML returns the custom HTML settings.
+		CustomHTML(ctx context.Context) *CustomHTML
+		// FFMpegExtraArgs returns the extra arguments of ffmpeg thumb generator.
+		FFMpegExtraArgs(ctx context.Context) string
 	}
 	UseFirstSiteUrlCtxKey = struct{}
 )
@@ -222,6 +230,30 @@ type (
 		adapterChain SettingStoreAdapter
 	}
 )
+
+func (s *settingProvider) CustomHTML(ctx context.Context) *CustomHTML {
+	return &CustomHTML{
+		HeadlessFooter: s.getString(ctx, "headless_footer_html", ""),
+		HeadlessBody:   s.getString(ctx, "headless_bottom_html", ""),
+		SidebarBottom:  s.getString(ctx, "sidebar_bottom_html", ""),
+	}
+}
+func (s *settingProvider) CustomNavItems(ctx context.Context) []CustomNavItem {
+	raw := s.getString(ctx, "custom_nav_items", "[]")
+	var items []CustomNavItem
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return []CustomNavItem{}
+	}
+	return items
+}
+func (s *settingProvider) CustomProps(ctx context.Context) []types.CustomProps {
+	raw := s.getString(ctx, "custom_props", "[]")
+	var props []types.CustomProps
+	if err := json.Unmarshal([]byte(raw), &props); err != nil {
+		return []types.CustomProps{}
+	}
+	return props
+}
 
 func (s *settingProvider) License(ctx context.Context) string {
 	return s.getString(ctx, "license", "")
@@ -374,6 +406,10 @@ func (s *settingProvider) FFMpegThumbExts(ctx context.Context) []string {
 
 func (s *settingProvider) FFMpegThumbSeek(ctx context.Context) string {
 	return s.getString(ctx, "thumb_ffmpeg_seek", "00:00:01.00")
+}
+
+func (s *settingProvider) FFMpegExtraArgs(ctx context.Context) string {
+	return s.getString(ctx, "thumb_ffmpeg_extra_args", "")
 }
 
 func (s *settingProvider) FFMpegThumbMaxSize(ctx context.Context) int64 {

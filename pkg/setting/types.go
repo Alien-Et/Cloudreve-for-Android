@@ -209,3 +209,15 @@ type AvatarProcess struct {
 	MaxFileSize int64  `json:"max_file_size"`
 	MaxWidth    int    `json:"max_width"`
 }
+
+type CustomNavItem struct {
+	Icon string `json:"icon"`
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+type CustomHTML struct {
+	HeadlessFooter string `json:"headless_footer,omitempty"`
+	HeadlessBody   string `json:"headless_bottom,omitempty"`
+	SidebarBottom  string `json:"sidebar_bottom,omitempty"`
+}
