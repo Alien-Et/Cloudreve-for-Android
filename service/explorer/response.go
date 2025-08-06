@@ -250,12 +250,15 @@ type DirectLink struct {
 }
 
 type StoragePolicy struct {
-	ID            string           `json:"id"`
-	Name          string           `json:"name"`
-	AllowedSuffix []string         `json:"allowed_suffix,omitempty"`
-	Type          types.PolicyType `json:"type"`
-	MaxSize       int64            `json:"max_size"`
-	Relay         bool             `json:"relay,omitempty"`
+	ID                string           `json:"id"`
+	Name              string           `json:"name"`
+	AllowedSuffix     []string         `json:"allowed_suffix,omitempty"`
+	DeniedSuffix      []string         `json:"denied_suffix,omitempty"`
+	AllowedNameRegexp string           `json:"allowed_name_regexp,omitempty"`
+	DeniedNameRegexp  string           `json:"denied_name_regexp,omitempty"`
+	Type              types.PolicyType `json:"type"`
+	MaxSize           int64            `json:"max_size"`
+	Relay             bool             `json:"relay,omitempty"`
 }
 
 type Entity struct {
@@ -442,14 +445,30 @@ func BuildStoragePolicy(sp *ent.StoragePolicy, hasher hashid.Encoder) *StoragePo
 	if sp == nil {
 		return nil
 	}
-	return &StoragePolicy{
-		ID:            hashid.EncodePolicyID(hasher, sp.ID),
-		Name:          sp.Name,
-		Type:          types.PolicyType(sp.Type),
-		MaxSize:       sp.MaxSize,
-		AllowedSuffix: sp.Settings.FileType,
-		Relay:         sp.Settings.Relay,
+
+	res := &StoragePolicy{
+		ID:      hashid.EncodePolicyID(hasher, sp.ID),
+		Name:    sp.Name,
+		Type:    types.PolicyType(sp.Type),
+		MaxSize: sp.MaxSize,
+		Relay:   sp.Settings.Relay,
 	}
+
+	if sp.Settings.IsFileTypeDenyList {
+		res.DeniedSuffix = sp.Settings.FileType
+	} else {
+		res.AllowedSuffix = sp.Settings.FileType
+	}
+
+	if sp.Settings.NameRegexp != "" {
+		if sp.Settings.IsNameRegexpDenyList {
+			res.DeniedNameRegexp = sp.Settings.NameRegexp
+		} else {
+			res.AllowedNameRegexp = sp.Settings.NameRegexp
+		}
+	}
+
+	return res
 }
 
 func WriteEventSourceHeader(c *gin.Context) {

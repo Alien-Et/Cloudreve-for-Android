@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -765,44 +766,69 @@ func (f *DBFS) navigatorId(path *fs.URI) string {
 
 // generateSavePath generates the physical save path for the upload request.
 func generateSavePath(policy *ent.StoragePolicy, req *fs.UploadRequest, user *ent.User) string {
-	baseTable := map[string]string{
-		"{randomkey16}":    util.RandStringRunes(16),
-		"{randomkey8}":     util.RandStringRunes(8),
-		"{timestamp}":      strconv.FormatInt(time.Now().Unix(), 10),
-		"{timestamp_nano}": strconv.FormatInt(time.Now().UnixNano(), 10),
-		"{randomnum2}":     strconv.Itoa(rand.Intn(2)),
-		"{randomnum3}":     strconv.Itoa(rand.Intn(3)),
-		"{randomnum4}":     strconv.Itoa(rand.Intn(4)),
-		"{randomnum8}":     strconv.Itoa(rand.Intn(8)),
-		"{uid}":            strconv.Itoa(user.ID),
-		"{datetime}":       time.Now().Format("20060102150405"),
-		"{date}":           time.Now().Format("20060102"),
-		"{year}":           time.Now().Format("2006"),
-		"{month}":          time.Now().Format("01"),
-		"{day}":            time.Now().Format("02"),
-		"{hour}":           time.Now().Format("15"),
-		"{minute}":         time.Now().Format("04"),
-		"{second}":         time.Now().Format("05"),
+	currentTime := time.Now()
+	originName := req.Props.Uri.Name()
+
+	dynamicReplace := func(regPattern string, rule string) string {
+		re := regexp.MustCompile(regPattern)
+		return re.ReplaceAllStringFunc(rule, func(match string) string {
+			switch match {
+				case "{timestamp}":
+					return strconv.FormatInt(currentTime.Unix(), 10)
+				case "{timestamp_nano}":
+					return strconv.FormatInt(currentTime.UnixNano(), 10)
+				case "{datetime}":
+					return currentTime.Format("20060102150405")
+				case "{date}":
+					return currentTime.Format("20060102")
+				case "{year}":
+					return currentTime.Format("2006")
+				case "{month}":
+					return currentTime.Format("01")
+				case "{day}":
+					return currentTime.Format("02")
+				case "{hour}":
+					return currentTime.Format("15")
+				case "{minute}":
+					return currentTime.Format("04")
+				case "{second}":
+					return currentTime.Format("05")
+				case "{uid}":
+					return strconv.Itoa(user.ID)
+				case "{randomkey16}":
+					return util.RandStringRunes(16)
+				case "{randomkey8}":
+					return util.RandStringRunes(8)
+				case "{randomnum8}":
+					return strconv.Itoa(rand.Intn(8))
+				case "{randomnum4}":
+					return strconv.Itoa(rand.Intn(4))
+				case "{randomnum3}":
+					return strconv.Itoa(rand.Intn(3))
+				case "{randomnum2}":
+					return strconv.Itoa(rand.Intn(2))
+				case "{uuid}":
+					return uuid.Must(uuid.NewV4()).String()
+				case "{path}":
+					return req.Props.Uri.Dir() + fs.Separator
+				case "{originname}":
+					return originName
+				case "{ext}":
+					return filepath.Ext(originName)
+				case "{originname_without_ext}":
+					return strings.TrimSuffix(originName, filepath.Ext(originName))
+				default:
+					return match
+			}
+		})
 	}
 
 	dirRule := policy.DirNameRule
 	dirRule = filepath.ToSlash(dirRule)
-	dirRule = util.Replace(baseTable, dirRule)
-	dirRule = util.Replace(map[string]string{
-		"{path}": req.Props.Uri.Dir() + fs.Separator,
-	}, dirRule)
-
-	originName := req.Props.Uri.Name()
-	nameTable := map[string]string{
-		"{originname}":             originName,
-		"{ext}":                    filepath.Ext(originName),
-		"{originname_without_ext}": strings.TrimSuffix(originName, filepath.Ext(originName)),
-		"{uuid}":                   uuid.Must(uuid.NewV4()).String(),
-	}
+	dirRule = dynamicReplace(`\{[^{}]+\}`, dirRule)
 
 	nameRule := policy.FileNameRule
-	nameRule = util.Replace(baseTable, nameRule)
-	nameRule = util.Replace(nameTable, nameRule)
+	nameRule = dynamicReplace(`\{[^{}]+\}`, nameRule)
 
 	return path.Join(path.Clean(dirRule), nameRule)
 }

@@ -120,6 +120,20 @@ func (f *DBFS) Create(ctx context.Context, path *fs.URI, fileType types.FileType
 
 			ancestor = newFile(ancestor, newFolder)
 		} else {
+			// valide file name
+			policy, err := f.getPreferredPolicy(ctx, ancestor)
+			if err != nil {
+				return nil, err
+			}
+
+			if err := validateExtension(desired[i], policy); err != nil {
+				return nil, fs.ErrIllegalObjectName.WithError(err)
+			}
+
+			if err := validateFileNameRegexp(desired[i], policy); err != nil {
+				return nil, fs.ErrIllegalObjectName.WithError(err)
+			}
+
 			file, err := f.createFile(ctx, ancestor, desired[i], fileType, o)
 			if err != nil {
 				return nil, err
@@ -168,6 +182,10 @@ func (f *DBFS) Rename(ctx context.Context, path *fs.URI, newName string) (fs.Fil
 
 	if target.Type() == types.FileTypeFile {
 		if err := validateExtension(newName, policy); err != nil {
+			return nil, fs.ErrIllegalObjectName.WithError(err)
+		}
+
+		if err := validateFileNameRegexp(newName, policy); err != nil {
 			return nil, fs.ErrIllegalObjectName.WithError(err)
 		}
 	}

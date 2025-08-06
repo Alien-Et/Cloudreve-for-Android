@@ -41,6 +41,12 @@ type (
 		Token string `json:"token"`
 		// 允许的文件扩展名
 		FileType []string `json:"file_type"`
+		// IsFileTypeDenyList Whether above list is a deny list.
+		IsFileTypeDenyList bool `json:"is_file_type_deny_list,omitempty"`
+		// FileRegexp 文件扩展名正则表达式
+		NameRegexp string `json:"file_regexp,omitempty"`
+		// IsNameRegexp Whether above regexp is a deny list.
+		IsNameRegexpDenyList bool `json:"is_name_regexp_deny_list,omitempty"`
 		// OauthRedirect Oauth 重定向地址
 		OauthRedirect string `json:"od_redirect,omitempty"`
 		// CustomProxy whether to use custom-proxy to get file content
@@ -255,6 +261,7 @@ const (
 	PolicyTypeOss    = "oss"
 	PolicyTypeCos    = "cos"
 	PolicyTypeS3     = "s3"
+	PolicyTypeKs3    = "ks3"
 	PolicyTypeOd     = "onedrive"
 	PolicyTypeRemote = "remote"
 	PolicyTypeObs    = "obs"
