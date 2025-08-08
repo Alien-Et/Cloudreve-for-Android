@@ -311,6 +311,7 @@ func CronCollectTrashBin(ctx context.Context) {
 		res, err := fm.fs.AllFilesInTrashBin(ctx, fs.WithPageSize(pageSize))
 		if err != nil {
 			l.Error("Failed to get files in trash bin: %s", err)
+			return
 		}
 
 		expired := lo.Filter(res.Files, func(file fs.File, index int) bool {

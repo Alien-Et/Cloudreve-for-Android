@@ -652,7 +652,8 @@ func (f *DBFS) getPreferredPolicy(ctx context.Context, file *File) (*ent.Storage
 		return nil, fmt.Errorf("owner group not loaded")
 	}
 
-	groupPolicy, err := f.storagePolicyClient.GetByGroup(ctx, ownerGroup)
+	sc, _ := inventory.InheritTx(ctx, f.storagePolicyClient)
+	groupPolicy, err := sc.GetByGroup(ctx, ownerGroup)
 	if err != nil {
 		return nil, serializer.NewError(serializer.CodeDBError, "Failed to get available storage policies", err)
 	}
@@ -769,66 +770,69 @@ func generateSavePath(policy *ent.StoragePolicy, req *fs.UploadRequest, user *en
 	currentTime := time.Now()
 	originName := req.Props.Uri.Name()
 
-	dynamicReplace := func(regPattern string, rule string) string {
+	dynamicReplace := func(regPattern string, rule string, pathAvailable bool) string {
 		re := regexp.MustCompile(regPattern)
 		return re.ReplaceAllStringFunc(rule, func(match string) string {
 			switch match {
-				case "{timestamp}":
-					return strconv.FormatInt(currentTime.Unix(), 10)
-				case "{timestamp_nano}":
-					return strconv.FormatInt(currentTime.UnixNano(), 10)
-				case "{datetime}":
-					return currentTime.Format("20060102150405")
-				case "{date}":
-					return currentTime.Format("20060102")
-				case "{year}":
-					return currentTime.Format("2006")
-				case "{month}":
-					return currentTime.Format("01")
-				case "{day}":
-					return currentTime.Format("02")
-				case "{hour}":
-					return currentTime.Format("15")
-				case "{minute}":
-					return currentTime.Format("04")
-				case "{second}":
-					return currentTime.Format("05")
-				case "{uid}":
-					return strconv.Itoa(user.ID)
-				case "{randomkey16}":
-					return util.RandStringRunes(16)
-				case "{randomkey8}":
-					return util.RandStringRunes(8)
-				case "{randomnum8}":
-					return strconv.Itoa(rand.Intn(8))
-				case "{randomnum4}":
-					return strconv.Itoa(rand.Intn(4))
-				case "{randomnum3}":
-					return strconv.Itoa(rand.Intn(3))
-				case "{randomnum2}":
-					return strconv.Itoa(rand.Intn(2))
-				case "{uuid}":
-					return uuid.Must(uuid.NewV4()).String()
-				case "{path}":
+			case "{timestamp}":
+				return strconv.FormatInt(currentTime.Unix(), 10)
+			case "{timestamp_nano}":
+				return strconv.FormatInt(currentTime.UnixNano(), 10)
+			case "{datetime}":
+				return currentTime.Format("20060102150405")
+			case "{date}":
+				return currentTime.Format("20060102")
+			case "{year}":
+				return currentTime.Format("2006")
+			case "{month}":
+				return currentTime.Format("01")
+			case "{day}":
+				return currentTime.Format("02")
+			case "{hour}":
+				return currentTime.Format("15")
+			case "{minute}":
+				return currentTime.Format("04")
+			case "{second}":
+				return currentTime.Format("05")
+			case "{uid}":
+				return strconv.Itoa(user.ID)
+			case "{randomkey16}":
+				return util.RandStringRunes(16)
+			case "{randomkey8}":
+				return util.RandStringRunes(8)
+			case "{randomnum8}":
+				return strconv.Itoa(rand.Intn(8))
+			case "{randomnum4}":
+				return strconv.Itoa(rand.Intn(4))
+			case "{randomnum3}":
+				return strconv.Itoa(rand.Intn(3))
+			case "{randomnum2}":
+				return strconv.Itoa(rand.Intn(2))
+			case "{uuid}":
+				return uuid.Must(uuid.NewV4()).String()
+			case "{path}":
+				if pathAvailable {
 					return req.Props.Uri.Dir() + fs.Separator
-				case "{originname}":
-					return originName
-				case "{ext}":
-					return filepath.Ext(originName)
-				case "{originname_without_ext}":
-					return strings.TrimSuffix(originName, filepath.Ext(originName))
-				default:
-					return match
+				}
+				return match
+			case "{originname}":
+				return originName
+			case "{ext}":
+				return filepath.Ext(originName)
+			case "{originname_without_ext}":
+				return strings.TrimSuffix(originName, filepath.Ext(originName))
+			default:
+				return match
 			}
 		})
 	}
 
 	dirRule := policy.DirNameRule
 	dirRule = filepath.ToSlash(dirRule)
-	dirRule = dynamicReplace(`\{[^{}]+\}`, dirRule)
+	dirRule = dynamicReplace(`\{[^{}]+\}`, dirRule, true)
 
 	nameRule := policy.FileNameRule
-	nameRule = dynamicReplace(`\{[^{}]+\}`, nameRule)
+	nameRule = dynamicReplace(`\{[^{}]+\}`, nameRule, false)
 
 	return path.Join(path.Clean(dirRule), nameRule)
 }
