@@ -7,16 +7,19 @@ import (
 // UserSetting 用户其他配置
 type (
 	UserSetting struct {
-		ProfileOff          bool                    `json:"profile_off,omitempty"`
-		PreferredTheme      string                  `json:"preferred_theme,omitempty"`
-		VersionRetention    bool                    `json:"version_retention,omitempty"`
-		VersionRetentionExt []string                `json:"version_retention_ext,omitempty"`
-		VersionRetentionMax int                     `json:"version_retention_max,omitempty"`
-		Pined               []PinedFile             `json:"pined,omitempty"`
-		Language            string                  `json:"email_language,omitempty"`
-		DisableViewSync     bool                    `json:"disable_view_sync,omitempty"`
-		FsViewMap           map[string]ExplorerView `json:"fs_view_map,omitempty"`
+		ProfileOff          bool                     `json:"profile_off,omitempty"`
+		PreferredTheme      string                   `json:"preferred_theme,omitempty"`
+		VersionRetention    bool                     `json:"version_retention,omitempty"`
+		VersionRetentionExt []string                 `json:"version_retention_ext,omitempty"`
+		VersionRetentionMax int                      `json:"version_retention_max,omitempty"`
+		Pined               []PinedFile              `json:"pined,omitempty"`
+		Language            string                   `json:"email_language,omitempty"`
+		DisableViewSync     bool                     `json:"disable_view_sync,omitempty"`
+		FsViewMap           map[string]ExplorerView  `json:"fs_view_map,omitempty"`
+		ShareLinksInProfile ShareLinksInProfileLevel `json:"share_links_in_profile,omitempty"`
 	}
+
+	ShareLinksInProfileLevel string
 
 	PinedFile struct {
 		Uri  string `json:"uri"`
@@ -333,4 +336,10 @@ const (
 	CustomPropsTypeMultiSelect = "multi_select"
 	CustomPropsTypeLink        = "link"
 	CustomPropsTypeRating      = "rating"
+)
+
+const (
+	ProfilePublicShareOnly = ShareLinksInProfileLevel("")
+	ProfileAllShare        = ShareLinksInProfileLevel("all_share")
+	ProfileHideShare       = ShareLinksInProfileLevel("hide_share")
 )

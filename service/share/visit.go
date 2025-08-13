@@ -137,6 +137,16 @@ func (s *ListShareService) ListInUserProfile(c *gin.Context, uid int) (*ListShar
 	hasher := dep.HashIDEncoder()
 	shareClient := dep.ShareClient()
 
+	targetUser, err := dep.UserClient().GetActiveByID(c, uid)
+	if err != nil {
+		return nil, serializer.NewError(serializer.CodeDBError, "Failed to get user", err)
+	}
+
+	if targetUser.Settings != nil && targetUser.Settings.ShareLinksInProfile == types.ProfileHideShare {
+		return nil, serializer.NewError(serializer.CodeParamErr, "User has disabled share links in profile", nil)
+	}
+
+	publicOnly := targetUser.Settings == nil || targetUser.Settings.ShareLinksInProfile == types.ProfilePublicShareOnly
 	args := &inventory.ListShareArgs{
 		PaginationArgs: &inventory.PaginationArgs{
 			UseCursorPagination: true,
@@ -146,7 +156,7 @@ func (s *ListShareService) ListInUserProfile(c *gin.Context, uid int) (*ListShar
 			OrderBy:             s.OrderBy,
 		},
 		UserID:     uid,
-		PublicOnly: true,
+		PublicOnly: publicOnly,
 	}
 
 	ctx := context.WithValue(c, inventory.LoadShareUser{}, true)

@@ -907,7 +907,7 @@ func (f *fileClient) CreateEntity(ctx context.Context, file *ent.File, args *Ent
 
 	diff := map[int]int64{file.OwnerID: created.Size}
 
-	if err := f.client.File.UpdateOne(file).AddEntities(created).Exec(ctx); err != nil {
+	if err := f.client.Entity.UpdateOne(created).AddFile(file).Exec(ctx); err != nil {
 		return nil, diff, fmt.Errorf("failed to add file entity: %v", err)
 	}
 

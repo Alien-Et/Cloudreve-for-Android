@@ -24,7 +24,6 @@ require (
 	github.com/gin-contrib/static v0.0.0-20191128031702-f81c604d8ac2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-ini/ini v1.50.0
-	github.com/go-mail/mail v2.3.1+incompatible
 	github.com/go-playground/validator/v10 v10.20.0
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/go-webauthn/webauthn v0.11.2
@@ -56,6 +55,7 @@ require (
 	github.com/tencentyun/cos-go-sdk-v5 v0.7.54
 	github.com/ua-parser/uap-go v0.0.0-20250213224047-9c035f085b90
 	github.com/upyun/go-sdk v2.1.0+incompatible
+	github.com/wneessen/go-mail v0.6.2
 	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e
 	golang.org/x/image v0.0.0-20211028202545-6944b10bf410
 	golang.org/x/text v0.23.0
@@ -141,8 +141,6 @@ require (
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
-	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
-	gopkg.in/mail.v2 v2.3.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect

@@ -271,19 +271,20 @@ type Entity struct {
 }
 
 type Share struct {
-	ID              string          `json:"id"`
-	Name            string          `json:"name,omitempty"`
-	RemainDownloads *int            `json:"remain_downloads,omitempty"`
-	Visited         int             `json:"visited"`
-	Downloaded      int             `json:"downloaded,omitempty"`
-	Expires         *time.Time      `json:"expires,omitempty"`
-	Unlocked        bool            `json:"unlocked"`
-	SourceType      *types.FileType `json:"source_type,omitempty"`
-	Owner           user.User       `json:"owner"`
-	CreatedAt       time.Time       `json:"created_at,omitempty"`
-	Expired         bool            `json:"expired"`
-	Url             string          `json:"url"`
-	ShowReadMe      bool            `json:"show_readme,omitempty"`
+	ID                string          `json:"id"`
+	Name              string          `json:"name,omitempty"`
+	RemainDownloads   *int            `json:"remain_downloads,omitempty"`
+	Visited           int             `json:"visited"`
+	Downloaded        int             `json:"downloaded,omitempty"`
+	Expires           *time.Time      `json:"expires,omitempty"`
+	Unlocked          bool            `json:"unlocked"`
+	PasswordProtected bool            `json:"password_protected,omitempty"`
+	SourceType        *types.FileType `json:"source_type,omitempty"`
+	Owner             user.User       `json:"owner"`
+	CreatedAt         time.Time       `json:"created_at,omitempty"`
+	Expired           bool            `json:"expired"`
+	Url               string          `json:"url"`
+	ShowReadMe        bool            `json:"show_readme,omitempty"`
 
 	// Only viewable by owner
 	IsPrivate bool   `json:"is_private,omitempty"`
@@ -301,15 +302,16 @@ func BuildShare(s *ent.Share, base *url.URL, hasher hashid.Encoder, requester *e
 		redactLevel = user.RedactLevelUser
 	}
 	res := Share{
-		Name:       name,
-		ID:         hashid.EncodeShareID(hasher, s.ID),
-		Unlocked:   unlocked,
-		Owner:      user.BuildUserRedacted(owner, redactLevel, hasher),
-		Expired:    inventory.IsShareExpired(s) != nil || expired,
-		Url:        BuildShareLink(s, hasher, base),
-		CreatedAt:  s.CreatedAt,
-		Visited:    s.Views,
-		SourceType: util.ToPtr(t),
+		Name:              name,
+		ID:                hashid.EncodeShareID(hasher, s.ID),
+		Unlocked:          unlocked,
+		Owner:             user.BuildUserRedacted(owner, redactLevel, hasher),
+		Expired:           inventory.IsShareExpired(s) != nil || expired,
+		Url:               BuildShareLink(s, hasher, base, unlocked),
+		CreatedAt:         s.CreatedAt,
+		Visited:           s.Views,
+		SourceType:        util.ToPtr(t),
+		PasswordProtected: s.Password != "",
 	}
 
 	if unlocked {
@@ -436,9 +438,12 @@ func BuildEntity(extendedInfo *fs.FileExtendedInfo, e fs.Entity, hasher hashid.E
 	}
 }
 
-func BuildShareLink(s *ent.Share, hasher hashid.Encoder, base *url.URL) string {
+func BuildShareLink(s *ent.Share, hasher hashid.Encoder, base *url.URL, unlocked bool) string {
 	shareId := hashid.EncodeShareID(hasher, s.ID)
-	return routes.MasterShareUrl(base, shareId, s.Password).String()
+	if unlocked {
+		return routes.MasterShareUrl(base, shareId, s.Password).String()
+	}
+	return routes.MasterShareUrl(base, shareId, "").String()
 }
 
 func BuildStoragePolicy(sp *ent.StoragePolicy, hasher hashid.Encoder) *StoragePolicy {
