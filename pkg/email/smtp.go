@@ -121,17 +121,17 @@ func (client *SMTPPool) Init() {
 			}
 		}()
 
-		tlsPolicy := mail.TLSOpportunistic
+		opts := []mail.Option{
+			mail.WithPort(client.config.Port),
+			mail.WithTimeout(time.Duration(client.config.Keepalive+5) * time.Second),
+			mail.WithSMTPAuth(mail.SMTPAuthAutoDiscover), mail.WithTLSPortPolicy(mail.TLSOpportunistic),
+			mail.WithUsername(client.config.User), mail.WithPassword(client.config.Password),
+		}
 		if client.config.ForceEncryption {
-			tlsPolicy = mail.TLSMandatory
+			opts = append(opts, mail.WithSSL())
 		}
 
-		d, diaErr := mail.NewClient(client.config.Host,
-			mail.WithPort(client.config.Port),
-			mail.WithTimeout(time.Duration(client.config.Keepalive+5)*time.Second),
-			mail.WithSMTPAuth(mail.SMTPAuthAutoDiscover), mail.WithTLSPortPolicy(tlsPolicy),
-			mail.WithUsername(client.config.User), mail.WithPassword(client.config.Password),
-		)
+		d, diaErr := mail.NewClient(client.config.Host, opts...)
 		if diaErr != nil {
 			client.l.Panic("Failed to create SMTP client: %s", diaErr)
 			return

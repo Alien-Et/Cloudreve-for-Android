@@ -139,15 +139,16 @@ func (s *TestSMTPService) Test(c *gin.Context) error {
 		return serializer.NewError(serializer.CodeParamErr, "Invalid SMTP port", err)
 	}
 
-	tlsPolicy := mail.TLSOpportunistic
-	if setting.IsTrueValue(s.Settings["smtpEncryption"]) {
-		tlsPolicy = mail.TLSMandatory
-	}
-	d, diaErr := mail.NewClient(s.Settings["smtpHost"],
+	opts := []mail.Option{
 		mail.WithPort(port),
-		mail.WithSMTPAuth(mail.SMTPAuthAutoDiscover), mail.WithTLSPortPolicy(tlsPolicy),
+		mail.WithSMTPAuth(mail.SMTPAuthAutoDiscover), mail.WithTLSPortPolicy(mail.TLSOpportunistic),
 		mail.WithUsername(s.Settings["smtpUser"]), mail.WithPassword(s.Settings["smtpPass"]),
-	)
+	}
+	if setting.IsTrueValue(s.Settings["smtpEncryption"]) {
+		opts = append(opts, mail.WithSSL())
+	}
+
+	d, diaErr := mail.NewClient(s.Settings["smtpHost"], opts...)
 	if diaErr != nil {
 		return serializer.NewError(serializer.CodeInternalSetting, "Failed to create SMTP client: "+diaErr.Error(), diaErr)
 	}
