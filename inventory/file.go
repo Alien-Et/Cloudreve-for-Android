@@ -57,6 +57,9 @@ type (
 		UserID          int
 		Name            string
 		StoragePolicyID int
+		HasMetadata     string
+		Shared          bool
+		HasDirectLink   bool
 	}
 
 	MetadataFilter struct {
@@ -1096,6 +1099,18 @@ func (f *fileClient) FlattenListFiles(ctx context.Context, args *FlattenListFile
 
 	if args.Name != "" {
 		query = query.Where(file.NameContainsFold(args.Name))
+	}
+
+	if args.HasMetadata != "" {
+		query = query.Where(file.HasMetadataWith(metadata.Name(args.HasMetadata)))
+	}
+
+	if args.Shared {
+		query = query.Where(file.HasSharesWith(share.DeletedAtIsNil()))
+	}
+
+	if args.HasDirectLink {
+		query = query.Where(file.HasDirectLinksWith(directlink.DeletedAtIsNil()))
 	}
 
 	query.Order(getFileOrderOption(&ListFileParameters{

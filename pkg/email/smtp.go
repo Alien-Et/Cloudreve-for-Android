@@ -2,6 +2,7 @@ package email
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -159,6 +160,16 @@ func (client *SMTPPool) Init() {
 
 				l := client.l.CopyWithPrefix(fmt.Sprintf("[Cid: %s]", m.cid))
 				if err := d.Send(m.msg); err != nil {
+					// Check if this is an SMTP RESET error after successful delivery
+					var sendErr *mail.SendError
+					var errParsed = errors.As(err, &sendErr)
+					if errParsed && sendErr.Reason == mail.ErrSMTPReset {
+						open = false
+						l.Debug("SMTP RESET error, closing connection...")
+						// https://github.com/wneessen/go-mail/issues/463
+						continue // Don't treat this as a delivery failure since mail was sent
+					}
+
 					l.Warning("Failed to send email: %s, Cid=%s", err, m.cid)
 				} else {
 					l.Info("Email sent to %q, title: %q.", m.to, m.subject)

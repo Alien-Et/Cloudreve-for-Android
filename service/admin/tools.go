@@ -2,6 +2,7 @@ package admin
 
 import (
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -165,6 +166,13 @@ func (s *TestSMTPService) Test(c *gin.Context) error {
 
 	err = d.DialAndSendWithContext(c, m)
 	if err != nil {
+		// Check if this is an SMTP RESET error after successful delivery
+		var sendErr *mail.SendError
+		var errParsed = errors.As(err, &sendErr)
+		if errParsed && sendErr.Reason == mail.ErrSMTPReset {
+			return nil // Don't treat this as a delivery failure since mail was sent
+		}
+
 		return serializer.NewError(serializer.CodeInternalSetting, "Failed to send test email: "+err.Error(), err)
 	}
 
