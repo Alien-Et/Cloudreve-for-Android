@@ -566,6 +566,10 @@ func initMasterRouter(dep dependency.Dep) *gin.Engine {
 				controllers.FromQuery[explorer.ListFileService](explorer.ListFileParameterCtx{}),
 				controllers.ListDirectory,
 			)
+			file.GET("archive",
+				controllers.FromQuery[explorer.ArchiveListFilesService](explorer.ArchiveListFilesParamCtx{}),
+				controllers.ListArchiveFiles,
+			)
 			// Create file
 			file.POST("create",
 				controllers.FromJSON[explorer.CreateFileService](explorer.CreateFileParameterCtx{}),

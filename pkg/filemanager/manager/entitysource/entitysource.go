@@ -670,7 +670,7 @@ func (f *entitySource) getRsc(pos int64) (io.ReadCloser, error) {
 
 		if f.o.SpeedLimit > 0 {
 			bucket := ratelimit.NewBucketWithRate(float64(f.o.SpeedLimit), f.o.SpeedLimit)
-			return lrs{f.rsc, ratelimit.Reader(f.rsc, bucket)}, nil
+			return lrs{file, ratelimit.Reader(file, bucket)}, nil
 		} else {
 			return file, nil
 		}

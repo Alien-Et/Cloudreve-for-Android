@@ -699,6 +699,8 @@ func LockSessionToContext(ctx context.Context, session LockSession) context.Cont
 	return context.WithValue(ctx, LockSessionCtxKey{}, session)
 }
 
+// FindDesiredEntity finds the desired entity from the file.
+// entityType is optional, if it is not nil, it will only return the entity with the given type.
 func FindDesiredEntity(file File, version string, hasher hashid.Encoder, entityType *types.EntityType) (bool, Entity) {
 	if version == "" {
 		return true, file.PrimaryEntity()

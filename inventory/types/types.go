@@ -101,6 +101,8 @@ type (
 		SourceAuth bool `json:"source_auth,omitempty"`
 		// QiniuUploadCdn whether to use CDN for Qiniu upload.
 		QiniuUploadCdn bool `json:"qiniu_upload_cdn,omitempty"`
+		// ChunkConcurrency the number of chunks to upload concurrently.
+		ChunkConcurrency int `json:"chunk_concurrency,omitempty"`
 	}
 
 	FileType         int
@@ -291,18 +293,19 @@ const (
 
 type (
 	Viewer struct {
-		ID          string                             `json:"id"`
-		Type        ViewerType                         `json:"type"`
-		DisplayName string                             `json:"display_name"`
-		Exts        []string                           `json:"exts"`
-		Url         string                             `json:"url,omitempty"`
-		Icon        string                             `json:"icon,omitempty"`
-		WopiActions map[string]map[ViewerAction]string `json:"wopi_actions,omitempty"`
-		Props       map[string]string                  `json:"props,omitempty"`
-		MaxSize     int64                              `json:"max_size,omitempty"`
-		Disabled    bool                               `json:"disabled,omitempty"`
-		Templates   []NewFileTemplate                  `json:"templates,omitempty"`
-		Platform    string                             `json:"platform,omitempty"`
+		ID                      string                             `json:"id"`
+		Type                    ViewerType                         `json:"type"`
+		DisplayName             string                             `json:"display_name"`
+		Exts                    []string                           `json:"exts"`
+		Url                     string                             `json:"url,omitempty"`
+		Icon                    string                             `json:"icon,omitempty"`
+		WopiActions             map[string]map[ViewerAction]string `json:"wopi_actions,omitempty"`
+		Props                   map[string]string                  `json:"props,omitempty"`
+		MaxSize                 int64                              `json:"max_size,omitempty"`
+		Disabled                bool                               `json:"disabled,omitempty"`
+		Templates               []NewFileTemplate                  `json:"templates,omitempty"`
+		Platform                string                             `json:"platform,omitempty"`
+		RequiredGroupPermission []GroupPermission                  `json:"required_group_permission,omitempty"`
 	}
 	ViewerGroup struct {
 		Viewers []Viewer `json:"viewers"`

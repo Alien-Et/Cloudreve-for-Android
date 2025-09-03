@@ -85,7 +85,10 @@ type (
 	}
 
 	Archiver interface {
+		// CreateArchive creates an archive
 		CreateArchive(ctx context.Context, uris []*fs.URI, writer io.Writer, opts ...fs.Option) (int, error)
+		// ListArchiveFiles lists files in an archive
+		ListArchiveFiles(ctx context.Context, uri *fs.URI, entity string) ([]ArchivedFile, error)
 	}
 
 	FileManager interface {

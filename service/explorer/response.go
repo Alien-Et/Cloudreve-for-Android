@@ -26,6 +26,16 @@ import (
 	"github.com/samber/lo"
 )
 
+type ArchiveListFilesResponse struct {
+	Files []manager.ArchivedFile `json:"files"`
+}
+
+func BuildArchiveListFilesResponse(files []manager.ArchivedFile) *ArchiveListFilesResponse {
+	return &ArchiveListFilesResponse{
+		Files: files,
+	}
+}
+
 type PutRelativeResponse struct {
 	Name string
 	Url  string
@@ -259,6 +269,7 @@ type StoragePolicy struct {
 	Type              types.PolicyType `json:"type"`
 	MaxSize           int64            `json:"max_size"`
 	Relay             bool             `json:"relay,omitempty"`
+	ChunkConcurrency  int              `json:"chunk_concurrency,omitempty"`
 }
 
 type Entity struct {
@@ -452,11 +463,12 @@ func BuildStoragePolicy(sp *ent.StoragePolicy, hasher hashid.Encoder) *StoragePo
 	}
 
 	res := &StoragePolicy{
-		ID:      hashid.EncodePolicyID(hasher, sp.ID),
-		Name:    sp.Name,
-		Type:    types.PolicyType(sp.Type),
-		MaxSize: sp.MaxSize,
-		Relay:   sp.Settings.Relay,
+		ID:               hashid.EncodePolicyID(hasher, sp.ID),
+		Name:             sp.Name,
+		Type:             types.PolicyType(sp.Type),
+		MaxSize:          sp.MaxSize,
+		Relay:            sp.Settings.Relay,
+		ChunkConcurrency: sp.Settings.ChunkConcurrency,
 	}
 
 	if sp.Settings.IsFileTypeDenyList {

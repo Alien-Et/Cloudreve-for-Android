@@ -47,14 +47,15 @@ type (
 	}
 	ExtractArchiveTaskPhase string
 	ExtractArchiveTaskState struct {
-		Uri             string `json:"uri,omitempty"`
-		Encoding        string `json:"encoding,omitempty"`
-		Dst             string `json:"dst,omitempty"`
-		TempPath        string `json:"temp_path,omitempty"`
-		TempZipFilePath string `json:"temp_zip_file_path,omitempty"`
-		ProcessedCursor string `json:"processed_cursor,omitempty"`
-		SlaveTaskID     int    `json:"slave_task_id,omitempty"`
-		Password        string `json:"password,omitempty"`
+		Uri             string   `json:"uri,omitempty"`
+		Encoding        string   `json:"encoding,omitempty"`
+		Dst             string   `json:"dst,omitempty"`
+		TempPath        string   `json:"temp_path,omitempty"`
+		TempZipFilePath string   `json:"temp_zip_file_path,omitempty"`
+		ProcessedCursor string   `json:"processed_cursor,omitempty"`
+		SlaveTaskID     int      `json:"slave_task_id,omitempty"`
+		Password        string   `json:"password,omitempty"`
+		FileMask        []string `json:"file_mask,omitempty"`
 		NodeState       `json:",inline"`
 		Phase           ExtractArchiveTaskPhase `json:"phase,omitempty"`
 	}
@@ -119,13 +120,14 @@ var encodings = map[string]encoding.Encoding{
 }
 
 // NewExtractArchiveTask creates a new ExtractArchiveTask
-func NewExtractArchiveTask(ctx context.Context, src, dst, encoding, password string) (queue.Task, error) {
+func NewExtractArchiveTask(ctx context.Context, src, dst, encoding, password string, mask []string) (queue.Task, error) {
 	state := &ExtractArchiveTaskState{
 		Uri:       src,
 		Dst:       dst,
 		Encoding:  encoding,
 		NodeState: NodeState{},
 		Password:  password,
+		FileMask:  mask,
 	}
 	stateBytes, err := json.Marshal(state)
 	if err != nil {
@@ -247,6 +249,7 @@ func (m *ExtractArchiveTask) createSlaveExtractTask(ctx context.Context, dep dep
 		Dst:      m.state.Dst,
 		UserID:   user.ID,
 		Password: m.state.Password,
+		FileMask: m.state.FileMask,
 	}
 
 	payloadStr, err := json.Marshal(payload)
@@ -415,6 +418,14 @@ func (m *ExtractArchiveTask) masterExtractArchive(ctx context.Context, dep depen
 
 		rawPath := util.FormSlash(f.NameInArchive)
 		savePath := dst.JoinRaw(rawPath)
+
+		// If file mask is not empty, check if the path is in the mask
+		if len(m.state.FileMask) > 0 && !isFileInMask(rawPath, m.state.FileMask) {
+			m.l.Warning("File %q is not in the mask, skipping...", f.NameInArchive)
+			atomic.AddInt64(&m.progress[ProgressTypeExtractCount].Current, 1)
+			atomic.AddInt64(&m.progress[ProgressTypeExtractSize].Current, f.Size())
+			return nil
+		}
 
 		// Check if path is legit
 		if !strings.HasPrefix(savePath.Path(), util.FillSlash(path.Clean(dst.Path()))) {
@@ -599,6 +610,7 @@ type (
 		TempZipFilePath string             `json:"temp_zip_file_path,omitempty"`
 		ProcessedCursor string             `json:"processed_cursor,omitempty"`
 		Password        string             `json:"password,omitempty"`
+		FileMask        []string           `json:"file_mask,omitempty"`
 	}
 )
 
@@ -779,6 +791,12 @@ func (m *SlaveExtractArchiveTask) Do(ctx context.Context) (task.Status, error) {
 		rawPath := util.FormSlash(f.NameInArchive)
 		savePath := dst.JoinRaw(rawPath)
 
+		// If file mask is not empty, check if the path is in the mask
+		if len(m.state.FileMask) > 0 && !isFileInMask(rawPath, m.state.FileMask) {
+			m.l.Debug("File %q is not in the mask, skipping...", f.NameInArchive)
+			return nil
+		}
+
 		// Check if path is legit
 		if !strings.HasPrefix(savePath.Path(), util.FillSlash(path.Clean(dst.Path()))) {
 			atomic.AddInt64(&m.progress[ProgressTypeExtractCount].Current, 1)
@@ -845,4 +863,18 @@ func (m *SlaveExtractArchiveTask) Progress(ctx context.Context) queue.Progresses
 	m.Lock()
 	defer m.Unlock()
 	return m.progress
+}
+
+func isFileInMask(path string, mask []string) bool {
+	if len(mask) == 0 {
+		return true
+	}
+
+	for _, m := range mask {
+		if path == m || strings.HasPrefix(path, m+"/") {
+			return true
+		}
+	}
+
+	return false
 }

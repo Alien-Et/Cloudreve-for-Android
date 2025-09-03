@@ -760,7 +760,6 @@ func (f *DBFS) deleteFiles(ctx context.Context, targets map[Navigator][]*File, f
 	if f.user.Edges.Group == nil {
 		return nil, nil, fmt.Errorf("user group not loaded")
 	}
-	limit := max(f.user.Edges.Group.Settings.MaxWalkedFiles, 1)
 	allStaleEntities := make([]fs.Entity, 0, len(targets))
 	storageDiff := make(inventory.StorageDiff)
 	for n, files := range targets {
@@ -774,8 +773,7 @@ func (f *DBFS) deleteFiles(ctx context.Context, targets map[Navigator][]*File, f
 
 		// List all files to be deleted
 		toBeDeletedFiles := make([]*File, 0, len(files))
-		if err := n.Walk(ctx, files, limit, intsets.MaxInt, func(targets []*File, level int) error {
-			limit -= len(targets)
+		if err := n.Walk(ctx, files, intsets.MaxInt, intsets.MaxInt, func(targets []*File, level int) error {
 			toBeDeletedFiles = append(toBeDeletedFiles, targets...)
 			return nil
 		}); err != nil {

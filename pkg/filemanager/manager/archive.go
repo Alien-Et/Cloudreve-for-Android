@@ -3,18 +3,94 @@ package manager
 import (
 	"archive/zip"
 	"context"
+	"encoding/gob"
 	"fmt"
 	"io"
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/bodgit/sevenzip"
 	"github.com/cloudreve/Cloudreve/v4/inventory/types"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/fs"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/fs/dbfs"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/manager/entitysource"
+	"github.com/cloudreve/Cloudreve/v4/pkg/util"
 	"golang.org/x/tools/container/intsets"
 )
+
+type (
+	ArchivedFile struct {
+		Name        string     `json:"name"`
+		Size        int64      `json:"size"`
+		UpdatedAt   *time.Time `json:"updated_at"`
+		IsDirectory bool       `json:"is_directory"`
+	}
+)
+
+const (
+	ArchiveListCacheTTL = 3600 // 1 hour
+)
+
+func init() {
+	gob.Register([]ArchivedFile{})
+}
+
+func (m *manager) ListArchiveFiles(ctx context.Context, uri *fs.URI, entity string) ([]ArchivedFile, error) {
+	file, err := m.fs.Get(ctx, uri, dbfs.WithFileEntities(), dbfs.WithRequiredCapabilities(dbfs.NavigatorCapabilityDownloadFile))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file: %w", err)
+	}
+
+	if file.Type() != types.FileTypeFile {
+		return nil, fs.ErrNotSupportedAction.WithError(fmt.Errorf("path %s is not a file", uri))
+	}
+
+	// Validate file size
+	if m.user.Edges.Group.Settings.DecompressSize > 0 && file.Size() > m.user.Edges.Group.Settings.DecompressSize {
+		return nil, fs.ErrFileSizeTooBig.WithError(fmt.Errorf("file size %d exceeds the limit %d", file.Size(), m.user.Edges.Group.Settings.DecompressSize))
+	}
+
+	found, targetEntity := fs.FindDesiredEntity(file, entity, m.hasher, nil)
+	if !found {
+		return nil, fs.ErrEntityNotExist
+	}
+
+	cacheKey := getArchiveListCacheKey(targetEntity.ID())
+	kv := m.kv
+	res, found := kv.Get(cacheKey)
+	if found {
+		return res.([]ArchivedFile), nil
+	}
+
+	es, err := m.GetEntitySource(ctx, 0, fs.WithEntity(targetEntity))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get entity source: %w", err)
+	}
+
+	es.Apply(entitysource.WithContext(ctx))
+	defer es.Close()
+
+	var readerFunc func(ctx context.Context, file io.ReaderAt, size int64) ([]ArchivedFile, error)
+	switch file.Ext() {
+	case "zip":
+		readerFunc = getZipFileList
+	case "7z":
+		readerFunc = get7zFileList
+	default:
+		return nil, fs.ErrNotSupportedAction.WithError(fmt.Errorf("not supported archive format: %s", file.Ext()))
+	}
+
+	sr := io.NewSectionReader(es, 0, targetEntity.Size())
+	fileList, err := readerFunc(ctx, sr, targetEntity.Size())
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file list: %w", err)
+	}
+
+	kv.Set(cacheKey, fileList, ArchiveListCacheTTL)
+	return fileList, nil
+}
 
 func (m *manager) CreateArchive(ctx context.Context, uris []*fs.URI, writer io.Writer, opts ...fs.Option) (int, error) {
 	o := newOption()
@@ -121,4 +197,48 @@ func (m *manager) compressFileToArchive(ctx context.Context, parent string, file
 	_, err = io.Copy(writer, es)
 	return err
 
+}
+
+func getZipFileList(ctx context.Context, file io.ReaderAt, size int64) ([]ArchivedFile, error) {
+	zr, err := zip.NewReader(file, size)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create zip reader: %w", err)
+	}
+
+	fileList := make([]ArchivedFile, 0, len(zr.File))
+	for _, f := range zr.File {
+		info := f.FileInfo()
+		modTime := info.ModTime()
+		fileList = append(fileList, ArchivedFile{
+			Name:        util.FormSlash(f.Name),
+			Size:        info.Size(),
+			UpdatedAt:   &modTime,
+			IsDirectory: info.IsDir(),
+		})
+	}
+	return fileList, nil
+}
+
+func get7zFileList(ctx context.Context, file io.ReaderAt, size int64) ([]ArchivedFile, error) {
+	zr, err := sevenzip.NewReader(file, size)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create 7z reader: %w", err)
+	}
+
+	fileList := make([]ArchivedFile, 0, len(zr.File))
+	for _, f := range zr.File {
+		info := f.FileInfo()
+		modTime := info.ModTime()
+		fileList = append(fileList, ArchivedFile{
+			Name:        util.FormSlash(f.Name),
+			Size:        info.Size(),
+			UpdatedAt:   &modTime,
+			IsDirectory: info.IsDir(),
+		})
+	}
+	return fileList, nil
+}
+
+func getArchiveListCacheKey(entity int) string {
+	return fmt.Sprintf("archive_list_%d", entity)
 }

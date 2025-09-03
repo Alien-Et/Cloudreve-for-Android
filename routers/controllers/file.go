@@ -412,3 +412,17 @@ func PatchView(c *gin.Context) {
 
 	c.JSON(200, serializer.Response{})
 }
+
+func ListArchiveFiles(c *gin.Context) {
+	service := ParametersFromContext[*explorer.ArchiveListFilesService](c, explorer.ArchiveListFilesParamCtx{})
+	resp, err := service.List(c)
+	if err != nil {
+		c.JSON(200, serializer.Err(c, err))
+		c.Abort()
+		return
+	}
+
+	c.JSON(200, serializer.Response{
+		Data: resp,
+	})
+}

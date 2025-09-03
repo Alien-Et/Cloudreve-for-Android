@@ -140,9 +140,9 @@ func (handler *Driver) Put(ctx context.Context, file *fs.UploadRequest) error {
 	}
 
 	openMode := os.O_CREATE | os.O_RDWR
-	if file.Mode&fs.ModeOverwrite == fs.ModeOverwrite && file.Offset == 0 {
-		openMode |= os.O_TRUNC
-	}
+	// if file.Mode&fs.ModeOverwrite == fs.ModeOverwrite && file.Offset == 0 {
+	// 	openMode |= os.O_TRUNC
+	// }
 
 	out, err := os.OpenFile(dst, openMode, Perm)
 	if err != nil {
