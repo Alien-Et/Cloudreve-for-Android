@@ -2,7 +2,7 @@ module github.com/cloudreve/Cloudreve/v4
 
 go 1.23.0
 
-toolchain go1.24.6
+toolchain go1.24.7
 
 require (
 	entgo.io/ent v0.13.0

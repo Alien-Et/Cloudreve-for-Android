@@ -257,6 +257,7 @@ func FileTypeFromString(s string) FileType {
 const (
 	DavAccountReadOnly DavAccountOption = iota
 	DavAccountProxy
+	DavAccountDisableSysFiles
 )
 
 const (

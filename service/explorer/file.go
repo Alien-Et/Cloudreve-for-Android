@@ -720,8 +720,9 @@ func (s *PatchViewService) Patch(c *gin.Context) error {
 type (
 	ArchiveListFilesParamCtx struct{}
 	ArchiveListFilesService  struct {
-		Uri    string `form:"uri" binding:"required"`
-		Entity string `form:"entity"`
+		Uri          string `form:"uri" binding:"required"`
+		Entity       string `form:"entity"`
+		TextEncoding string `form:"text_encoding"`
 	}
 )
 
@@ -739,7 +740,7 @@ func (s *ArchiveListFilesService) List(c *gin.Context) (*ArchiveListFilesRespons
 		return nil, serializer.NewError(serializer.CodeParamErr, "unknown uri", err)
 	}
 
-	files, err := m.ListArchiveFiles(c, uri, s.Entity)
+	files, err := m.ListArchiveFiles(c, uri, s.Entity, s.TextEncoding)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list archive files: %w", err)
 	}
