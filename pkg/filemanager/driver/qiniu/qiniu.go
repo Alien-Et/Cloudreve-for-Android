@@ -223,7 +223,7 @@ func (handler *Driver) Put(ctx context.Context, file *fs.UploadRequest) error {
 
 	mimeType := file.Props.MimeType
 	if mimeType == "" {
-		handler.mime.TypeByName(file.Props.Uri.Name())
+		mimeType = handler.mime.TypeByName(file.Props.Uri.Name())
 	}
 
 	err = resumeUploader.CompleteParts(ctx, upToken, upHost, nil, handler.policy.BucketName,
@@ -389,7 +389,7 @@ func (handler *Driver) Token(ctx context.Context, uploadSession *fs.UploadSessio
 
 	mimeType := file.Props.MimeType
 	if mimeType == "" {
-		handler.mime.TypeByName(file.Props.Uri.Name())
+		mimeType = handler.mime.TypeByName(file.Props.Uri.Name())
 	}
 
 	uploadSession.UploadID = ret.UploadID
@@ -433,7 +433,7 @@ func (handler *Driver) Capabilities() *driver.Capabilities {
 	}
 }
 
-func (handler *Driver) MediaMeta(ctx context.Context, path, ext string) ([]driver.MediaMeta, error) {
+func (handler *Driver) MediaMeta(ctx context.Context, path, ext, language string) ([]driver.MediaMeta, error) {
 	if util.ContainsString(supportedImageExt, ext) {
 		return handler.extractImageMeta(ctx, path)
 	}

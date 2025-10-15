@@ -1,10 +1,14 @@
 package basic
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/cloudreve/Cloudreve/v4/application/dependency"
 	"github.com/cloudreve/Cloudreve/v4/inventory"
 	"github.com/cloudreve/Cloudreve/v4/inventory/types"
 	"github.com/cloudreve/Cloudreve/v4/pkg/setting"
+	"github.com/cloudreve/Cloudreve/v4/pkg/thumb"
 	"github.com/cloudreve/Cloudreve/v4/service/user"
 	"github.com/gin-gonic/gin"
 	"github.com/mojocn/base64Captcha"
@@ -43,11 +47,15 @@ type SiteConfig struct {
 	EmojiPreset       string                    `json:"emoji_preset,omitempty"`
 	MapProvider       setting.MapProvider       `json:"map_provider,omitempty"`
 	GoogleMapTileType setting.MapGoogleTileType `json:"google_map_tile_type,omitempty"`
+	MapboxAK          string                    `json:"mapbox_ak,omitempty"`
 	FileViewers       []types.ViewerGroup       `json:"file_viewers,omitempty"`
 	MaxBatchSize      int                       `json:"max_batch_size,omitempty"`
 	ThumbnailWidth    int                       `json:"thumbnail_width,omitempty"`
 	ThumbnailHeight   int                       `json:"thumbnail_height,omitempty"`
 	CustomProps       []types.CustomProps       `json:"custom_props,omitempty"`
+
+	// Thumbnail section
+	ThumbExts []string `json:"thumb_exts,omitempty"`
 
 	// App settings
 	AppPromotion bool `json:"app_promotion,omitempty"`
@@ -104,6 +112,7 @@ func (s *GetSettingService) GetSiteConfig(c *gin.Context) (*SiteConfig, error) {
 			Icons:             explorerSettings.Icons,
 			MapProvider:       mapSettings.Provider,
 			GoogleMapTileType: mapSettings.GoogleTileType,
+			MapboxAK:          mapSettings.MapboxAK,
 			ThumbnailWidth:    w,
 			ThumbnailHeight:   h,
 			CustomProps:       customProps,
@@ -118,6 +127,47 @@ func (s *GetSettingService) GetSiteConfig(c *gin.Context) (*SiteConfig, error) {
 		return &SiteConfig{
 			AppPromotion: appSetting.Promotion,
 		}, nil
+	case "thumb":
+		// Return supported thumbnail extensions from enabled generators.
+		exts := map[string]bool{}
+		if settings.BuiltinThumbGeneratorEnabled(c) {
+			for _, e := range thumb.BuiltinSupportedExts {
+				exts[e] = true
+			}
+		}
+		if settings.FFMpegThumbGeneratorEnabled(c) {
+			for _, e := range settings.FFMpegThumbExts(c) {
+				exts[strings.ToLower(e)] = true
+			}
+		}
+		if settings.VipsThumbGeneratorEnabled(c) {
+			for _, e := range settings.VipsThumbExts(c) {
+				exts[strings.ToLower(e)] = true
+			}
+		}
+		if settings.LibreOfficeThumbGeneratorEnabled(c) {
+			for _, e := range settings.LibreOfficeThumbExts(c) {
+				exts[strings.ToLower(e)] = true
+			}
+		}
+		if settings.MusicCoverThumbGeneratorEnabled(c) {
+			for _, e := range settings.MusicCoverThumbExts(c) {
+				exts[strings.ToLower(e)] = true
+			}
+		}
+		if settings.LibRawThumbGeneratorEnabled(c) {
+			for _, e := range settings.LibRawThumbExts(c) {
+				exts[strings.ToLower(e)] = true
+			}
+		}
+
+		// map -> sorted slice
+		result := make([]string, 0, len(exts))
+		for e := range exts {
+			result = append(result, e)
+		}
+		sort.Strings(result)
+		return &SiteConfig{ThumbExts: result}, nil
 	default:
 		break
 	}

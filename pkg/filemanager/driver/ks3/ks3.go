@@ -219,7 +219,7 @@ func (handler *Driver) Put(ctx context.Context, file *fs.UploadRequest) error {
 
 	mimeType := file.Props.MimeType
 	if mimeType == "" {
-		handler.mime.TypeByName(file.Props.Uri.Name())
+		mimeType = handler.mime.TypeByName(file.Props.Uri.Name())
 	}
 
 	_, err := uploader.UploadWithContext(ctx, &s3manager.UploadInput{
@@ -306,7 +306,7 @@ func (handler *Driver) Thumb(ctx context.Context, expire *time.Time, ext string,
 	case "jpg", "webp":
 		thumbParam += fmt.Sprintf("&q=%d&F=%s", enco.Quality, enco.Format)
 	case "png":
-	    thumbParam += fmt.Sprintf("&F=%s", enco.Format)
+		thumbParam += fmt.Sprintf("&F=%s", enco.Format)
 	}
 
 	// 确保过期时间不小于 0 ，如果小于则设置为 7 天
@@ -318,10 +318,10 @@ func (handler *Driver) Thumb(ctx context.Context, expire *time.Time, ext string,
 	}
 
 	thumbUrl, err := handler.svc.GeneratePresignedUrl(&s3.GeneratePresignedUrlInput{
-		HTTPMethod: s3.GET,                            // 请求方法
-		Bucket:     &handler.policy.BucketName,        // 存储空间名称
-		Key:        aws.String(e.Source()+thumbParam), // 对象的key
-		Expires:    ttl,                               // 过期时间，转换为秒数
+		HTTPMethod: s3.GET,                              // 请求方法
+		Bucket:     &handler.policy.BucketName,          // 存储空间名称
+		Key:        aws.String(e.Source() + thumbParam), // 对象的key
+		Expires:    ttl,                                 // 过期时间，转换为秒数
 	})
 
 	if err != nil {
@@ -399,7 +399,7 @@ func (handler *Driver) Token(ctx context.Context, uploadSession *fs.UploadSessio
 
 	mimeType := file.Props.MimeType
 	if mimeType == "" {
-		handler.mime.TypeByName(file.Props.Uri.Name())
+		mimeType = handler.mime.TypeByName(file.Props.Uri.Name())
 	}
 
 	// 创建分片上传
@@ -505,7 +505,7 @@ func (handler *Driver) Capabilities() *driver.Capabilities {
 }
 
 // MediaMeta 获取媒体元信息
-func (handler *Driver) MediaMeta(ctx context.Context, path, ext string) ([]driver.MediaMeta, error) {
+func (handler *Driver) MediaMeta(ctx context.Context, path, ext, language string) ([]driver.MediaMeta, error) {
 	return nil, errors.New("not implemented")
 }
 

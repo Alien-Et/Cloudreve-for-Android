@@ -160,6 +160,7 @@ type MapProvider string
 const (
 	MapProviderOpenStreetMap = MapProvider("openstreetmap")
 	MapProviderGoogle        = MapProvider("google")
+	MapProviderMapbox        = MapProvider("mapbox")
 )
 
 type MapGoogleTileType string
@@ -173,6 +174,7 @@ const (
 type MapSetting struct {
 	Provider       MapProvider
 	GoogleTileType MapGoogleTileType
+	MapboxAK       string
 }
 
 // Viewer related

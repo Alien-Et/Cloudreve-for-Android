@@ -102,6 +102,10 @@ type (
 		MediaMetaFFProbeSizeLimit(ctx context.Context) (int64, int64)
 		// MediaMetaFFProbePath returns the path of ffprobe executable.
 		MediaMetaFFProbePath(ctx context.Context) string
+		// MediaMetaGeocodingEnabled returns true if media meta geocoding is enabled.
+		MediaMetaGeocodingEnabled(ctx context.Context) bool
+		// MediaMetaGeocodingMapboxAK returns the Mapbox access token.
+		MediaMetaGeocodingMapboxAK(ctx context.Context) string
 		// ThumbSize returns the size limit of thumbnails.
 		ThumbSize(ctx context.Context) (int, int)
 		// ThumbEncode returns the thumbnail encoding settings.
@@ -306,6 +310,7 @@ func (s *settingProvider) MapSetting(ctx context.Context) *MapSetting {
 	return &MapSetting{
 		Provider:       MapProvider(s.getString(ctx, "map_provider", "openstreetmap")),
 		GoogleTileType: MapGoogleTileType(s.getString(ctx, "map_google_tile_type", "roadmap")),
+		MapboxAK:       s.getString(ctx, "map_mapbox_ak", ""),
 	}
 }
 
@@ -525,6 +530,14 @@ func (s *settingProvider) MediaMetaExifEnabled(ctx context.Context) bool {
 
 func (s *settingProvider) MediaMetaEnabled(ctx context.Context) bool {
 	return s.getBoolean(ctx, "media_meta", true)
+}
+
+func (s *settingProvider) MediaMetaGeocodingEnabled(ctx context.Context) bool {
+	return s.getBoolean(ctx, "media_meta_geocoding", false)
+}
+
+func (s *settingProvider) MediaMetaGeocodingMapboxAK(ctx context.Context) string {
+	return s.getString(ctx, "media_meta_geocoding_mapbox_ak", "")
 }
 
 func (s *settingProvider) PublicResourceMaxAge(ctx context.Context) int {

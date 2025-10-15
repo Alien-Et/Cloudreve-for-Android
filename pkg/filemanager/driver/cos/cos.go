@@ -244,7 +244,7 @@ func (handler *Driver) Put(ctx context.Context, file *fs.UploadRequest) error {
 
 	mimeType := file.Props.MimeType
 	if mimeType == "" {
-		handler.mime.TypeByName(file.Props.Uri.Name())
+		mimeType = handler.mime.TypeByName(file.Props.Uri.Name())
 	}
 
 	// 是否允许覆盖
@@ -382,7 +382,12 @@ func (handler Driver) Thumb(ctx context.Context, expire *time.Time, ext string, 
 func (handler Driver) Source(ctx context.Context, e fs.Entity, args *driver.GetSourceArgs) (string, error) {
 	// 添加各项设置
 	options := urlOption{}
+
 	if args.Speed > 0 {
+		// Byte 转换为 bit
+		args.Speed *= 8
+
+		// COS对速度值有范围限制
 		if args.Speed < 819200 {
 			args.Speed = 819200
 		}
@@ -391,6 +396,7 @@ func (handler Driver) Source(ctx context.Context, e fs.Entity, args *driver.GetS
 		}
 		options.Speed = args.Speed
 	}
+
 	if args.IsDownload {
 		encodedFilename := url.PathEscape(args.DisplayName)
 		options.ContentDescription = fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`,
@@ -449,7 +455,7 @@ func (handler Driver) Token(ctx context.Context, uploadSession *fs.UploadSession
 
 	mimeType := file.Props.MimeType
 	if mimeType == "" {
-		handler.mime.TypeByName(file.Props.Uri.Name())
+		mimeType = handler.mime.TypeByName(file.Props.Uri.Name())
 	}
 
 	// 初始化分片上传
@@ -588,7 +594,7 @@ func (handler Driver) Meta(ctx context.Context, path string) (*MetaData, error) 
 	}, nil
 }
 
-func (handler *Driver) MediaMeta(ctx context.Context, path, ext string) ([]driver.MediaMeta, error) {
+func (handler *Driver) MediaMeta(ctx context.Context, path, ext, language string) ([]driver.MediaMeta, error) {
 	if util.ContainsString(supportedImageExt, ext) {
 		return handler.extractImageMeta(ctx, path)
 	}

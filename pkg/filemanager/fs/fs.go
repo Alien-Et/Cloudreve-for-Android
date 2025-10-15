@@ -244,8 +244,8 @@ type (
 		UploadURLs     []string `json:"upload_urls,omitempty"`
 		Credential     string   `json:"credential,omitempty"`
 		UploadID       string   `json:"uploadID,omitempty"`
-		Callback       string   `json:"callback,omitempty"` // 回调地址
-		Uri            string   `json:"uri,omitempty"`      // 存储路径
+		Callback       string   `json:"callback,omitempty"`
+		Uri            string   `json:"uri,omitempty"` // 存储路径
 		AccessKey      string   `json:"ak,omitempty"`
 		KeyTime        string   `json:"keyTime,omitempty"` // COS用有效期
 		CompleteURL    string   `json:"completeURL,omitempty"`

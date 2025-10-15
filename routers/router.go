@@ -618,7 +618,7 @@ func initMasterRouter(dep dependency.Dep) *gin.Engine {
 					controllers.ServeEntity,
 				)
 			}
-			// 获取缩略图
+			// get thumb
 			file.GET("thumb",
 				middleware.ContextHint(),
 				controllers.FromQuery[explorer.FileThumbService](explorer.FileThumbParameterCtx{}),

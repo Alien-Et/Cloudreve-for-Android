@@ -467,7 +467,7 @@ func (d *dependency) MediaMetaExtractor(ctx context.Context) mediameta.Extractor
 		return d.mediaMeta
 	}
 
-	d.mediaMeta = mediameta.NewExtractorManager(ctx, d.SettingProvider(), d.Logger())
+	d.mediaMeta = mediameta.NewExtractorManager(ctx, d.SettingProvider(), d.Logger(), d.RequestClient())
 	return d.mediaMeta
 }
 
