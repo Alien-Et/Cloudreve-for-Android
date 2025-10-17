@@ -65,8 +65,12 @@ type Driver struct {
 type key int
 
 const (
-	chunkRetrySleep = time.Duration(5) * time.Second
-	maxDeleteBatch  = 1000
+	chunkRetrySleep       = time.Duration(5) * time.Second
+	maxDeleteBatch        = 1000
+	maxSignTTL            = time.Duration(24) * time.Hour * 7
+	completeAllHeader     = "x-oss-complete-all"
+	forbidOverwriteHeader = "x-oss-forbid-overwrite"
+	trafficLimitHeader    = "x-oss-traffic-limit"
 
 	// MultiPartUploadThreshold 服务端使用分片上传的阈值
 	MultiPartUploadThreshold int64 = 5 * (1 << 30) // 5GB
@@ -427,16 +431,22 @@ func (handler *Driver) Source(ctx context.Context, e fs.Entity, args *driver.Get
 		if args.Speed > 838860800 {
 			args.Speed = 838860800
 		}
-		req.TrafficLimit = args.Speed
+		req.Parameters = map[string]string{
+			trafficLimitHeader: strconv.FormatInt(args.Speed, 10),
+		}
 	}
 
 	return handler.signSourceURL(ctx, e.Source(), args.Expire, req, false)
 }
 
 func (handler *Driver) signSourceURL(ctx context.Context, path string, expire *time.Time, req *oss.GetObjectRequest, forceSign bool) (string, error) {
-	ttl := time.Duration(24) * time.Hour * 365 * 20
+	// V4 Sign 最大过期时间为7天
+	ttl := maxSignTTL
 	if expire != nil {
 		ttl = time.Until(*expire)
+		if ttl > maxSignTTL {
+			ttl = maxSignTTL
+		}
 	}
 
 	if req == nil {
@@ -461,10 +471,12 @@ func (handler *Driver) signSourceURL(ctx context.Context, path string, expire *t
 	// 公有空间替换掉Key及不支持的头
 	if !handler.policy.IsPrivate && !forceSign {
 		query := finalURL.Query()
-		query.Del("OSSAccessKeyId")
-		query.Del("Signature")
+		query.Del("x-oss-credential")
+		query.Del("x-oss-date")
+		query.Del("x-oss-expires")
+		query.Del("x-oss-signature")
+		query.Del("x-oss-signature-version")
 		query.Del("response-content-disposition")
-		query.Del("x-oss-traffic-limit")
 		finalURL.RawQuery = query.Encode()
 	}
 	return finalURL.String(), nil
@@ -554,9 +566,9 @@ func (handler *Driver) Token(ctx context.Context, uploadSession *fs.UploadSessio
 				"callback": callbackPolicyEncoded,
 			},
 			Headers: map[string]string{
-				"Content-Type":           "application/octet-stream",
-				"x-oss-complete-all":     "yes",
-				"x-oss-forbid-overwrite": "true",
+				"Content-Type":        "application/octet-stream",
+				completeAllHeader:     "yes",
+				forbidOverwriteHeader: "true",
 			},
 		},
 	}, oss.PresignExpires(ttl))

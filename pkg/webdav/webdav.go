@@ -212,7 +212,13 @@ func handleMkcol(c *gin.Context, user *ent.User, fm manager.FileManager) (status
 
 	_, err = fm.Create(ctx, uri, types.FileTypeFolder, dbfs.WithNoChainedCreation(), dbfs.WithErrorOnConflict())
 	if err != nil {
-		return purposeStatusCodeFromError(err), err
+		code := purposeStatusCodeFromError(err)
+		if code == http.StatusNotFound {
+			// When the MKCOL operation creates a new collection resource, all ancestors MUST already exist,
+			// or the method MUST fail with a 409 (Conflict) status code.
+			return http.StatusConflict, err
+		}
+		return code, err
 	}
 
 	return http.StatusCreated, nil
