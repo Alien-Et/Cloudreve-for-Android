@@ -2,6 +2,7 @@ package setting
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/cloudreve/Cloudreve/v4/inventory/types"
-
 	"github.com/cloudreve/Cloudreve/v4/pkg/auth/requestinfo"
 	"github.com/cloudreve/Cloudreve/v4/pkg/boolset"
 )
@@ -208,6 +208,14 @@ type (
 		CustomHTML(ctx context.Context) *CustomHTML
 		// FFMpegExtraArgs returns the extra arguments of ffmpeg thumb generator.
 		FFMpegExtraArgs(ctx context.Context) string
+		// MasterEncryptKey returns the master encrypt key.
+		MasterEncryptKey(ctx context.Context) []byte
+		// MasterEncryptKeyVault returns the master encrypt key vault type.
+		MasterEncryptKeyVault(ctx context.Context) MasterEncryptKeyVaultType
+		// MasterEncryptKeyFile returns the master encrypt key file.
+		MasterEncryptKeyFile(ctx context.Context) string
+		// ShowEncryptionStatus returns true if encryption status is shown.
+		ShowEncryptionStatus(ctx context.Context) bool
 	}
 	UseFirstSiteUrlCtxKey = struct{}
 )
@@ -234,6 +242,27 @@ type (
 		adapterChain SettingStoreAdapter
 	}
 )
+
+func (s *settingProvider) ShowEncryptionStatus(ctx context.Context) bool {
+	return s.getBoolean(ctx, "show_encryption_status", true)
+}
+
+func (s *settingProvider) MasterEncryptKeyFile(ctx context.Context) string {
+	return s.getString(ctx, "encrypt_master_key_file", "")
+}
+
+func (s *settingProvider) MasterEncryptKeyVault(ctx context.Context) MasterEncryptKeyVaultType {
+	return MasterEncryptKeyVaultType(s.getString(ctx, "encrypt_master_key_vault", "setting"))
+}
+
+func (s *settingProvider) MasterEncryptKey(ctx context.Context) []byte {
+	encoded := s.getString(ctx, "encrypt_master_key", "")
+	key, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil
+	}
+	return key
+}
 
 func (s *settingProvider) CustomHTML(ctx context.Context) *CustomHTML {
 	return &CustomHTML{
@@ -481,7 +510,7 @@ func (s *settingProvider) ThumbEncode(ctx context.Context) *ThumbEncode {
 }
 
 func (s *settingProvider) ThumbEntitySuffix(ctx context.Context) string {
-	return s.getString(ctx, "thumb_entity_suffix", "._thumb")
+	return s.getString(ctx, "thumb_entity_suffix", "{blob_path}/{blob_name}._thumb")
 }
 
 func (s *settingProvider) ThumbSlaveSidecarSuffix(ctx context.Context) string {

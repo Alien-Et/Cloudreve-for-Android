@@ -126,37 +126,49 @@ func BuildTaskResponse(task queue.Task, node *ent.Node, hasher hashid.Encoder) *
 }
 
 type UploadSessionResponse struct {
-	SessionID      string         `json:"session_id"`
-	UploadID       string         `json:"upload_id"`
-	ChunkSize      int64          `json:"chunk_size"` // 分块大小，0 为部分快
-	Expires        int64          `json:"expires"`    // 上传凭证过期时间， Unix 时间戳
-	UploadURLs     []string       `json:"upload_urls,omitempty"`
-	Credential     string         `json:"credential,omitempty"`
-	AccessKey      string         `json:"ak,omitempty"`
-	KeyTime        string         `json:"keyTime,omitempty"` // COS用有效期
-	CompleteURL    string         `json:"completeURL,omitempty"`
-	StoragePolicy  *StoragePolicy `json:"storage_policy,omitempty"`
-	Uri            string         `json:"uri"`
-	CallbackSecret string         `json:"callback_secret"`
-	MimeType       string         `json:"mime_type,omitempty"`
-	UploadPolicy   string         `json:"upload_policy,omitempty"`
+	SessionID       string                 `json:"session_id"`
+	UploadID        string                 `json:"upload_id"`
+	ChunkSize       int64                  `json:"chunk_size"` // 分块大小，0 为部分快
+	Expires         int64                  `json:"expires"`    // 上传凭证过期时间， Unix 时间戳
+	UploadURLs      []string               `json:"upload_urls,omitempty"`
+	Credential      string                 `json:"credential,omitempty"`
+	AccessKey       string                 `json:"ak,omitempty"`
+	KeyTime         string                 `json:"keyTime,omitempty"` // COS用有效期
+	CompleteURL     string                 `json:"completeURL,omitempty"`
+	StoragePolicy   *StoragePolicy         `json:"storage_policy,omitempty"`
+	Uri             string                 `json:"uri"`
+	CallbackSecret  string                 `json:"callback_secret"`
+	MimeType        string                 `json:"mime_type,omitempty"`
+	UploadPolicy    string                 `json:"upload_policy,omitempty"`
+	EncryptMetadata *types.EncryptMetadata `json:"encrypt_metadata,omitempty"`
 }
 
 func BuildUploadSessionResponse(session *fs.UploadCredential, hasher hashid.Encoder) *UploadSessionResponse {
-	return &UploadSessionResponse{
-		SessionID:      session.SessionID,
-		ChunkSize:      session.ChunkSize,
-		Expires:        session.Expires,
-		UploadURLs:     session.UploadURLs,
-		Credential:     session.Credential,
-		CompleteURL:    session.CompleteURL,
-		Uri:            session.Uri,
-		UploadID:       session.UploadID,
-		StoragePolicy:  BuildStoragePolicy(session.StoragePolicy, hasher),
-		CallbackSecret: session.CallbackSecret,
-		MimeType:       session.MimeType,
-		UploadPolicy:   session.UploadPolicy,
+	res := &UploadSessionResponse{
+		SessionID:       session.SessionID,
+		ChunkSize:       session.ChunkSize,
+		Expires:         session.Expires,
+		UploadURLs:      session.UploadURLs,
+		Credential:      session.Credential,
+		CompleteURL:     session.CompleteURL,
+		Uri:             session.Uri,
+		UploadID:        session.UploadID,
+		StoragePolicy:   BuildStoragePolicy(session.StoragePolicy, hasher),
+		CallbackSecret:  session.CallbackSecret,
+		MimeType:        session.MimeType,
+		UploadPolicy:    session.UploadPolicy,
+		EncryptMetadata: session.EncryptMetadata,
 	}
+
+	if session.EncryptMetadata != nil {
+		res.EncryptMetadata = &types.EncryptMetadata{
+			Algorithm:    session.EncryptMetadata.Algorithm,
+			KeyPlainText: session.EncryptMetadata.KeyPlainText,
+			IV:           session.EncryptMetadata.IV,
+		}
+	}
+
+	return res
 }
 
 // WopiFileInfo Response for `CheckFileInfo`
@@ -270,6 +282,7 @@ type StoragePolicy struct {
 	MaxSize           int64            `json:"max_size"`
 	Relay             bool             `json:"relay,omitempty"`
 	ChunkConcurrency  int              `json:"chunk_concurrency,omitempty"`
+	Encryption        bool             `json:"encryption,omitempty"`
 }
 
 type Entity struct {
@@ -279,6 +292,7 @@ type Entity struct {
 	CreatedAt     time.Time        `json:"created_at"`
 	StoragePolicy *StoragePolicy   `json:"storage_policy,omitempty"`
 	CreatedBy     *user.User       `json:"created_by,omitempty"`
+	EncryptedWith types.Cipher     `json:"encrypted_with,omitempty"`
 }
 
 type Share struct {
@@ -439,6 +453,12 @@ func BuildEntity(extendedInfo *fs.FileExtendedInfo, e fs.Entity, hasher hashid.E
 		userRedacted := user.BuildUserRedacted(e.CreatedBy(), user.RedactLevelAnonymous, hasher)
 		u = &userRedacted
 	}
+
+	encryptedWith := types.Cipher("")
+	if e.Encrypted() {
+		encryptedWith = e.Props().EncryptMetadata.Algorithm
+	}
+
 	return Entity{
 		ID:            hashid.EncodeEntityID(hasher, e.ID()),
 		Type:          e.Type(),
@@ -446,6 +466,7 @@ func BuildEntity(extendedInfo *fs.FileExtendedInfo, e fs.Entity, hasher hashid.E
 		StoragePolicy: BuildStoragePolicy(extendedInfo.EntityStoragePolicies[e.PolicyID()], hasher),
 		Size:          e.Size(),
 		CreatedBy:     u,
+		EncryptedWith: encryptedWith,
 	}
 }
 
@@ -469,6 +490,7 @@ func BuildStoragePolicy(sp *ent.StoragePolicy, hasher hashid.Encoder) *StoragePo
 		MaxSize:          sp.MaxSize,
 		Relay:            sp.Settings.Relay,
 		ChunkConcurrency: sp.Settings.ChunkConcurrency,
+		Encryption:       sp.Settings.Encryption,
 	}
 
 	if sp.Settings.IsFileTypeDenyList {

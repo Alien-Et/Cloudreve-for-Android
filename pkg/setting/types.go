@@ -223,3 +223,11 @@ type CustomHTML struct {
 	HeadlessBody   string `json:"headless_bottom,omitempty"`
 	SidebarBottom  string `json:"sidebar_bottom,omitempty"`
 }
+
+type MasterEncryptKeyVaultType string
+
+const (
+	MasterEncryptKeyVaultTypeSetting = MasterEncryptKeyVaultType("setting")
+	MasterEncryptKeyVaultTypeEnv     = MasterEncryptKeyVaultType("env")
+	MasterEncryptKeyVaultTypeFile    = MasterEncryptKeyVaultType("file")
+)

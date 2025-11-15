@@ -3,7 +3,6 @@ package routers
 import (
 	"net/http"
 
-	"github.com/abslant/gzip"
 	"github.com/cloudreve/Cloudreve/v4/application/constants"
 	"github.com/cloudreve/Cloudreve/v4/application/dependency"
 	"github.com/cloudreve/Cloudreve/v4/inventory/types"
@@ -24,6 +23,7 @@ import (
 	sharesvc "github.com/cloudreve/Cloudreve/v4/service/share"
 	usersvc "github.com/cloudreve/Cloudreve/v4/service/user"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
 
@@ -206,9 +206,9 @@ func initMasterRouter(dep dependency.Dep) *gin.Engine {
 	/*
 		静态资源
 	*/
-	r.Use(gzip.GzipHandler())                    // Done
-	r.Use(middleware.FrontendFileHandler(dep))   // Done
-	r.GET("manifest.json", controllers.Manifest) // Done
+	r.Use(gzip.Gzip(gzip.DefaultCompression, gzip.WithExcludedPaths([]string{"/api/"})))
+	r.Use(middleware.FrontendFileHandler(dep))
+	r.GET("manifest.json", controllers.Manifest)
 
 	noAuth := r.Group(constants.APIPrefix)
 	wopi := noAuth.Group("file/wopi", middleware.HashID(hashid.FileID), middleware.ViewerSessionValidation())

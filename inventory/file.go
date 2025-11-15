@@ -130,6 +130,7 @@ type (
 		Size            int64
 		UploadSessionID uuid.UUID
 		Importing       bool
+		EncryptMetadata *types.EncryptMetadata
 	}
 
 	RelocateEntityParameter struct {
@@ -188,7 +189,7 @@ type FileClient interface {
 	// Copy copies a layer of file to its corresponding destination folder. dstMap is a map from src parent ID to dst parent Files.
 	Copy(ctx context.Context, files []*ent.File, dstMap map[int][]*ent.File) (map[int][]*ent.File, StorageDiff, error)
 	// Delete deletes a group of files (and related models) with given entity recycle option
-	Delete(ctx context.Context, files []*ent.File, options *types.EntityRecycleOption) ([]*ent.Entity, StorageDiff, error)
+	Delete(ctx context.Context, files []*ent.File, options *types.EntityProps) ([]*ent.Entity, StorageDiff, error)
 	// StaleEntities returns stale entities of a given file. If ID is not provided, all entities
 	// will be examined.
 	StaleEntities(ctx context.Context, ids ...int) ([]*ent.Entity, error)
@@ -469,7 +470,7 @@ func (f *fileClient) DeleteByUser(ctx context.Context, uid int) error {
 	return nil
 }
 
-func (f *fileClient) Delete(ctx context.Context, files []*ent.File, options *types.EntityRecycleOption) ([]*ent.Entity, StorageDiff, error) {
+func (f *fileClient) Delete(ctx context.Context, files []*ent.File, options *types.EntityProps) ([]*ent.Entity, StorageDiff, error) {
 	// 1. Decrease reference count for all entities;
 	// entities stores the relation between its reference count in `files` and entity ID.
 	entities := make(map[int]int)
@@ -525,7 +526,7 @@ func (f *fileClient) Delete(ctx context.Context, files []*ent.File, options *typ
 	for _, chunk := range chunks {
 		if err := f.client.Entity.Update().
 			Where(entity.IDIn(chunk...)).
-			SetRecycleOptions(options).
+			SetProps(options).
 			Exec(ctx); err != nil {
 			return nil, nil, fmt.Errorf("failed to update recycle options for entities %v: %w", chunk, err)
 		}
@@ -884,12 +885,27 @@ func (f *fileClient) RemoveStaleEntities(ctx context.Context, file *ent.File) (S
 
 func (f *fileClient) CreateEntity(ctx context.Context, file *ent.File, args *EntityParameters) (*ent.Entity, StorageDiff, error) {
 	createdBy := UserFromContext(ctx)
+	var opt *types.EntityProps
+	if args.EncryptMetadata != nil {
+		opt = &types.EntityProps{
+			EncryptMetadata: &types.EncryptMetadata{
+				Algorithm: args.EncryptMetadata.Algorithm,
+				Key:       args.EncryptMetadata.Key,
+				IV:        args.EncryptMetadata.IV,
+			},
+		}
+	}
+
 	stm := f.client.Entity.
 		Create().
 		SetType(int(args.EntityType)).
 		SetSource(args.Source).
 		SetSize(args.Size).
 		SetStoragePolicyID(args.StoragePolicyID)
+
+	if opt != nil {
+		stm.SetProps(opt)
+	}
 
 	if createdBy != nil && !IsAnonymousUser(createdBy) {
 		stm.SetUser(createdBy)

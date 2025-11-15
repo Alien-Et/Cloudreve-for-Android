@@ -2,8 +2,11 @@ package inventory
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 
 	"github.com/cloudreve/Cloudreve/v4/ent"
 	"github.com/cloudreve/Cloudreve/v4/ent/setting"
@@ -552,7 +555,7 @@ var DefaultSettings = map[string]string{
 	"captcha_cap_asset_server":                   "jsdelivr",
 	"thumb_width":                                "400",
 	"thumb_height":                               "300",
-	"thumb_entity_suffix":                        "._thumb",
+	"thumb_entity_suffix":                        "{blob_path}/{blob_name}._thumb",
 	"thumb_slave_sidecar_suffix":                 "._thumb_sidecar",
 	"thumb_encode_method":                        "png",
 	"thumb_gc_after_gen":                         "0",
@@ -661,6 +664,15 @@ var DefaultSettings = map[string]string{
 	"headless_footer_html":                       "",
 	"headless_bottom_html":                       "",
 	"sidebar_bottom_html":                        "",
+	"encrypt_master_key":                         "",
+	"encrypt_master_key_vault":                   "setting",
+	"encrypt_master_key_file":                    "",
+	"show_encryption_status":                     "1",
+}
+
+var RedactedSettings = map[string]struct{}{
+	"encrypt_master_key": {},
+	"secret_key":         {},
 }
 
 func init() {
@@ -721,4 +733,10 @@ func init() {
 		panic(err)
 	}
 	DefaultSettings["mail_reset_template"] = string(mailResetTemplates)
+
+	key := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		panic(err)
+	}
+	DefaultSettings["encrypt_master_key"] = base64.StdEncoding.EncodeToString(key)
 }

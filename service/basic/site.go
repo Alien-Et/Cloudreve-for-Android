@@ -43,16 +43,17 @@ type SiteConfig struct {
 	PrivacyPolicyUrl string              `json:"privacy_policy_url,omitempty"`
 
 	// Explorer section
-	Icons             string                    `json:"icons,omitempty"`
-	EmojiPreset       string                    `json:"emoji_preset,omitempty"`
-	MapProvider       setting.MapProvider       `json:"map_provider,omitempty"`
-	GoogleMapTileType setting.MapGoogleTileType `json:"google_map_tile_type,omitempty"`
-	MapboxAK          string                    `json:"mapbox_ak,omitempty"`
-	FileViewers       []types.ViewerGroup       `json:"file_viewers,omitempty"`
-	MaxBatchSize      int                       `json:"max_batch_size,omitempty"`
-	ThumbnailWidth    int                       `json:"thumbnail_width,omitempty"`
-	ThumbnailHeight   int                       `json:"thumbnail_height,omitempty"`
-	CustomProps       []types.CustomProps       `json:"custom_props,omitempty"`
+	Icons                string                    `json:"icons,omitempty"`
+	EmojiPreset          string                    `json:"emoji_preset,omitempty"`
+	MapProvider          setting.MapProvider       `json:"map_provider,omitempty"`
+	GoogleMapTileType    setting.MapGoogleTileType `json:"google_map_tile_type,omitempty"`
+	MapboxAK             string                    `json:"mapbox_ak,omitempty"`
+	FileViewers          []types.ViewerGroup       `json:"file_viewers,omitempty"`
+	MaxBatchSize         int                       `json:"max_batch_size,omitempty"`
+	ThumbnailWidth       int                       `json:"thumbnail_width,omitempty"`
+	ThumbnailHeight      int                       `json:"thumbnail_height,omitempty"`
+	CustomProps          []types.CustomProps       `json:"custom_props,omitempty"`
+	ShowEncryptionStatus bool                      `json:"show_encryption_status,omitempty"`
 
 	// Thumbnail section
 	ThumbExts []string `json:"thumb_exts,omitempty"`
@@ -100,6 +101,7 @@ func (s *GetSettingService) GetSiteConfig(c *gin.Context) (*SiteConfig, error) {
 		fileViewers := settings.FileViewers(c)
 		customProps := settings.CustomProps(c)
 		maxBatchSize := settings.MaxBatchedFile(c)
+		showEncryptionStatus := settings.ShowEncryptionStatus(c)
 		w, h := settings.ThumbSize(c)
 		for i := range fileViewers {
 			for j := range fileViewers[i].Viewers {
@@ -107,15 +109,16 @@ func (s *GetSettingService) GetSiteConfig(c *gin.Context) (*SiteConfig, error) {
 			}
 		}
 		return &SiteConfig{
-			MaxBatchSize:      maxBatchSize,
-			FileViewers:       fileViewers,
-			Icons:             explorerSettings.Icons,
-			MapProvider:       mapSettings.Provider,
-			GoogleMapTileType: mapSettings.GoogleTileType,
-			MapboxAK:          mapSettings.MapboxAK,
-			ThumbnailWidth:    w,
-			ThumbnailHeight:   h,
-			CustomProps:       customProps,
+			MaxBatchSize:         maxBatchSize,
+			FileViewers:          fileViewers,
+			Icons:                explorerSettings.Icons,
+			MapProvider:          mapSettings.Provider,
+			GoogleMapTileType:    mapSettings.GoogleTileType,
+			MapboxAK:             mapSettings.MapboxAK,
+			ThumbnailWidth:       w,
+			ThumbnailHeight:      h,
+			CustomProps:          customProps,
+			ShowEncryptionStatus: showEncryptionStatus,
 		}, nil
 	case "emojis":
 		emojis := settings.EmojiPresets(c)

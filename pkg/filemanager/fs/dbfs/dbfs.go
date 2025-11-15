@@ -4,12 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"path"
 	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +14,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/inventory"
 	"github.com/cloudreve/Cloudreve/v4/inventory/types"
 	"github.com/cloudreve/Cloudreve/v4/pkg/cache"
+	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/encrypt"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/fs"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/lock"
 	"github.com/cloudreve/Cloudreve/v4/pkg/hashid"
@@ -47,7 +44,7 @@ type (
 func NewDatabaseFS(u *ent.User, fileClient inventory.FileClient, shareClient inventory.ShareClient,
 	l logging.Logger, ls lock.LockSystem, settingClient setting.Provider,
 	storagePolicyClient inventory.StoragePolicyClient, hasher hashid.Encoder, userClient inventory.UserClient,
-	cache, stateKv cache.Driver, directLinkClient inventory.DirectLinkClient) fs.FileSystem {
+	cache, stateKv cache.Driver, directLinkClient inventory.DirectLinkClient, encryptorFactory encrypt.CryptorFactory) fs.FileSystem {
 	return &DBFS{
 		user:                u,
 		navigators:          make(map[string]Navigator),
@@ -62,6 +59,7 @@ func NewDatabaseFS(u *ent.User, fileClient inventory.FileClient, shareClient inv
 		cache:               cache,
 		stateKv:             stateKv,
 		directLinkClient:    directLinkClient,
+		encryptorFactory:    encryptorFactory,
 	}
 }
 
@@ -80,6 +78,7 @@ type DBFS struct {
 	cache               cache.Driver
 	stateKv             cache.Driver
 	mu                  sync.Mutex
+	encryptorFactory    encrypt.CryptorFactory
 }
 
 func (f *DBFS) Recycle() {
@@ -123,7 +122,7 @@ func (f *DBFS) List(ctx context.Context, path *fs.URI, opts ...fs.Option) (fs.Fi
 
 	parent, err := f.getFileByPath(ctx, navigator, path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Parent not exist: %w", err)
+		return nil, nil, fmt.Errorf("parent not exist: %w", err)
 	}
 
 	pageSize := 0
@@ -287,6 +286,7 @@ func (f *DBFS) CreateEntity(ctx context.Context, file fs.File, policy *ent.Stora
 		Source:          req.Props.SavePath,
 		Size:            req.Props.Size,
 		UploadSessionID: uuid.FromStringOrNil(o.UploadRequest.Props.UploadSessionID),
+		EncryptMetadata: o.encryptMetadata,
 	})
 	if err != nil {
 		_ = inventory.Rollback(tx)
@@ -617,6 +617,7 @@ func (f *DBFS) createFile(ctx context.Context, parent *File, name string, fileTy
 			ModifiedAt:      o.UploadRequest.Props.LastModified,
 			UploadSessionID: uuid.FromStringOrNil(o.UploadRequest.Props.UploadSessionID),
 			Importing:       o.UploadRequest.ImportFrom != nil,
+			EncryptMetadata: o.encryptMetadata,
 		}
 	}
 
@@ -643,6 +644,20 @@ func (f *DBFS) createFile(ctx context.Context, parent *File, name string, fileTy
 
 	file.SetEntities([]*ent.Entity{entity})
 	return newFile(parent, file), nil
+}
+
+func (f *DBFS) generateEncryptMetadata(ctx context.Context, uploadRequest *fs.UploadRequest, policy *ent.StoragePolicy) (*types.EncryptMetadata, error) {
+	relayEnabled := policy.Settings != nil && policy.Settings.Relay
+	if (len(uploadRequest.Props.EncryptionSupported) > 0 && uploadRequest.Props.EncryptionSupported[0] == types.CipherAES256CTR) || relayEnabled {
+		encryptor, err := f.encryptorFactory(types.CipherAES256CTR)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get encryptor: %w", err)
+		}
+
+		return encryptor.GenerateMetadata(ctx)
+	}
+
+	return nil, nil
 }
 
 // getPreferredPolicy tries to get the preferred storage policy for the given file.
@@ -768,71 +783,16 @@ func (f *DBFS) navigatorId(path *fs.URI) string {
 // generateSavePath generates the physical save path for the upload request.
 func generateSavePath(policy *ent.StoragePolicy, req *fs.UploadRequest, user *ent.User) string {
 	currentTime := time.Now()
-	originName := req.Props.Uri.Name()
-
-	dynamicReplace := func(regPattern string, rule string, pathAvailable bool) string {
-		re := regexp.MustCompile(regPattern)
-		return re.ReplaceAllStringFunc(rule, func(match string) string {
-			switch match {
-			case "{timestamp}":
-				return strconv.FormatInt(currentTime.Unix(), 10)
-			case "{timestamp_nano}":
-				return strconv.FormatInt(currentTime.UnixNano(), 10)
-			case "{datetime}":
-				return currentTime.Format("20060102150405")
-			case "{date}":
-				return currentTime.Format("20060102")
-			case "{year}":
-				return currentTime.Format("2006")
-			case "{month}":
-				return currentTime.Format("01")
-			case "{day}":
-				return currentTime.Format("02")
-			case "{hour}":
-				return currentTime.Format("15")
-			case "{minute}":
-				return currentTime.Format("04")
-			case "{second}":
-				return currentTime.Format("05")
-			case "{uid}":
-				return strconv.Itoa(user.ID)
-			case "{randomkey16}":
-				return util.RandStringRunes(16)
-			case "{randomkey8}":
-				return util.RandStringRunes(8)
-			case "{randomnum8}":
-				return strconv.Itoa(rand.Intn(8))
-			case "{randomnum4}":
-				return strconv.Itoa(rand.Intn(4))
-			case "{randomnum3}":
-				return strconv.Itoa(rand.Intn(3))
-			case "{randomnum2}":
-				return strconv.Itoa(rand.Intn(2))
-			case "{uuid}":
-				return uuid.Must(uuid.NewV4()).String()
-			case "{path}":
-				if pathAvailable {
-					return req.Props.Uri.Dir() + fs.Separator
-				}
-				return match
-			case "{originname}":
-				return originName
-			case "{ext}":
-				return filepath.Ext(originName)
-			case "{originname_without_ext}":
-				return strings.TrimSuffix(originName, filepath.Ext(originName))
-			default:
-				return match
-			}
-		})
+	dynamicReplace := func(rule string, pathAvailable bool) string {
+		return util.ReplaceMagicVar(rule, fs.Separator, pathAvailable, false, currentTime, user.ID, req.Props.Uri.Name(), req.Props.Uri.Dir(), "")
 	}
 
 	dirRule := policy.DirNameRule
 	dirRule = filepath.ToSlash(dirRule)
-	dirRule = dynamicReplace(`\{[^{}]+\}`, dirRule, true)
+	dirRule = dynamicReplace(dirRule, true)
 
 	nameRule := policy.FileNameRule
-	nameRule = dynamicReplace(`\{[^{}]+\}`, nameRule, false)
+	nameRule = dynamicReplace(nameRule, false)
 
 	return path.Join(path.Clean(dirRule), nameRule)
 }

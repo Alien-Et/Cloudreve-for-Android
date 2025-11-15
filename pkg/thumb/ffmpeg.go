@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/driver"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/manager/entitysource"
 	"github.com/cloudreve/Cloudreve/v4/pkg/logging"
 	"github.com/cloudreve/Cloudreve/v4/pkg/setting"
@@ -51,10 +50,17 @@ func (f *FfmpegGenerator) Generate(ctx context.Context, es entitysource.EntitySo
 
 	input := ""
 	expire := time.Now().Add(urlTimeout)
-	if es.IsLocal() {
+	if es.IsLocal() && !es.Entity().Encrypted() {
 		input = es.LocalPath(ctx)
 	} else {
-		src, err := es.Url(driver.WithForcePublicEndpoint(ctx, false), entitysource.WithNoInternalProxy(), entitysource.WithContext(ctx), entitysource.WithExpire(&expire))
+		opts := []entitysource.EntitySourceOption{
+			entitysource.WithContext(ctx),
+			entitysource.WithExpire(&expire),
+		}
+		if !es.Entity().Encrypted() {
+			opts = append(opts, entitysource.WithNoInternalProxy())
+		}
+		src, err := es.Url(ctx, opts...)
 		if err != nil {
 			return &Result{Path: tempOutputPath}, fmt.Errorf("failed to get entity url: %w", err)
 		}

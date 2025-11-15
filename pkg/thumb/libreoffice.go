@@ -42,7 +42,7 @@ func (l *LibreOfficeGenerator) Generate(ctx context.Context, es entitysource.Ent
 	)
 
 	tempInputPath := ""
-	if es.IsLocal() {
+	if es.IsLocal() && !es.Entity().Encrypted() {
 		tempInputPath = es.LocalPath(ctx)
 	} else {
 		// If not local policy files, download to temp folder

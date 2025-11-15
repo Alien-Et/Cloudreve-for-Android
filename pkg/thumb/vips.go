@@ -46,7 +46,7 @@ func (v *VipsGenerator) Generate(ctx context.Context, es entitysource.EntitySour
 	usePipe := true
 	if runtime.GOOS == "windows" {
 		// Pipe IO is not working on Windows for VIPS
-		if es.IsLocal() {
+		if es.IsLocal() && !es.Entity().Encrypted() {
 			// escape [ and ] in file name
 			input = fmt.Sprintf("[filename=\"%s\"]", es.LocalPath(ctx))
 			usePipe = false

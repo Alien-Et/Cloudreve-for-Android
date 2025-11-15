@@ -78,7 +78,7 @@ func (f *fileClient) searchQuery(q *ent.FileQuery, args *SearchFileParameters, p
 				return metadata.And(metadata.NameEQ(item.Key), metadata.ValueEQ(item.Value))
 			}
 
-			nameEq := metadata.NameEQ(item.Key)
+			nameEq := metadata.And(metadata.IsPublic(true), metadata.NameEQ(item.Key))
 			if item.Value == "" {
 				return nameEq
 			} else {
@@ -86,8 +86,9 @@ func (f *fileClient) searchQuery(q *ent.FileQuery, args *SearchFileParameters, p
 				return metadata.And(nameEq, valueContain)
 			}
 		})
-		metaPredicates = append(metaPredicates, metadata.IsPublic(true))
-		q.Where(file.HasMetadataWith(metadata.And(metaPredicates...)))
+		q.Where(file.And(lo.Map(metaPredicates, func(item predicate.Metadata, index int) predicate.File {
+			return file.HasMetadataWith(item)
+		})...))
 	}
 
 	if args.SizeLte > 0 || args.SizeGte > 0 {

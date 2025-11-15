@@ -347,7 +347,7 @@ func (s *SingleFileService) Url(c *gin.Context) (string, error) {
 	}
 
 	es := entitysource.NewEntitySource(fs.NewEntity(primaryEntity), driver, policy, dep.GeneralAuth(),
-		dep.SettingProvider(), dep.HashIDEncoder(), dep.RequestClient(), dep.Logger(), dep.ConfigProvider(), dep.MimeDetector(ctx))
+		dep.SettingProvider(), dep.HashIDEncoder(), dep.RequestClient(), dep.Logger(), dep.ConfigProvider(), dep.MimeDetector(ctx), dep.EncryptorFactory(ctx))
 
 	expire := time.Now().Add(time.Hour * 1)
 	url, err := es.Url(ctx, entitysource.WithExpire(&expire), entitysource.WithDisplayName(file.Name))
@@ -547,7 +547,7 @@ func (s *SingleEntityService) Url(c *gin.Context) (string, error) {
 	}
 
 	es := entitysource.NewEntitySource(fs.NewEntity(entity), driver, policy, dep.GeneralAuth(),
-		dep.SettingProvider(), dep.HashIDEncoder(), dep.RequestClient(), dep.Logger(), dep.ConfigProvider(), dep.MimeDetector(c))
+		dep.SettingProvider(), dep.HashIDEncoder(), dep.RequestClient(), dep.Logger(), dep.ConfigProvider(), dep.MimeDetector(c), dep.EncryptorFactory(c))
 
 	expire := time.Now().Add(time.Hour * 1)
 	url, err := es.Url(c, entitysource.WithDownload(true), entitysource.WithExpire(&expire), entitysource.WithDisplayName(path.Base(entity.Source)))

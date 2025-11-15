@@ -194,9 +194,15 @@ func (m *ExtractArchiveTask) createSlaveExtractTask(ctx context.Context, dep dep
 		return task.StatusError, fmt.Errorf("failed to get policy: %w", err)
 	}
 
+	masterKey, _ := dep.MasterEncryptKeyVault(ctx).GetMasterKey(ctx)
+	entityModel, err := decryptEntityKeyIfNeeded(masterKey, archiveFile.PrimaryEntity().Model())
+	if err != nil {
+		return task.StatusError, fmt.Errorf("failed to decrypt entity key for archive file %q: %s", archiveFile.DisplayName(), err)
+	}
+
 	payload := &SlaveExtractArchiveTaskState{
 		FileName: archiveFile.DisplayName(),
-		Entity:   archiveFile.PrimaryEntity().Model(),
+		Entity:   entityModel,
 		Policy:   policy,
 		Encoding: m.state.Encoding,
 		Dst:      m.state.Dst,

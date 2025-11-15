@@ -312,9 +312,9 @@ func (f *DBFS) Delete(ctx context.Context, path []*fs.URI, opts ...fs.Option) ([
 		o.apply(opt)
 	}
 
-	var opt *types.EntityRecycleOption
+	var opt *types.EntityProps
 	if o.UnlinkOnly {
-		opt = &types.EntityRecycleOption{
+		opt = &types.EntityProps{
 			UnlinkOnly: true,
 		}
 	}
@@ -756,7 +756,7 @@ func (f *DBFS) setCurrentVersion(ctx context.Context, target *File, versionId in
 	return nil
 }
 
-func (f *DBFS) deleteFiles(ctx context.Context, targets map[Navigator][]*File, fc inventory.FileClient, opt *types.EntityRecycleOption) ([]fs.Entity, inventory.StorageDiff, error) {
+func (f *DBFS) deleteFiles(ctx context.Context, targets map[Navigator][]*File, fc inventory.FileClient, opt *types.EntityProps) ([]fs.Entity, inventory.StorageDiff, error) {
 	if f.user.Edges.Group == nil {
 		return nil, nil, fmt.Errorf("user group not loaded")
 	}

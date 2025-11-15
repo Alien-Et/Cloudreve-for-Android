@@ -22,6 +22,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/pkg/conf"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/driver"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/driver/local"
+	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/encrypt"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/fs"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/fs/mime"
 	"github.com/cloudreve/Cloudreve/v4/pkg/hashid"
@@ -83,6 +84,7 @@ type EntitySourceOptions struct {
 	OneTimeDownloadKey string
 	Ctx                context.Context
 	IsThumb            bool
+	DisableCryptor     bool
 }
 
 type EntityUrl struct {
@@ -143,22 +145,31 @@ func WithThumb(isThumb bool) EntitySourceOption {
 	})
 }
 
+// WithDisableCryptor disable cryptor for file source, file stream will be
+// presented as is.
+func WithDisableCryptor() EntitySourceOption {
+	return EntitySourceOptionFunc(func(option any) {
+		option.(*EntitySourceOptions).DisableCryptor = true
+	})
+}
+
 func (f EntitySourceOptionFunc) Apply(option any) {
 	f(option)
 }
 
 type (
 	entitySource struct {
-		e           fs.Entity
-		handler     driver.Handler
-		policy      *ent.StoragePolicy
-		generalAuth auth.Auth
-		settings    setting.Provider
-		hasher      hashid.Encoder
-		c           request.Client
-		l           logging.Logger
-		config      conf.ConfigProvider
-		mime        mime.MimeDetector
+		e                fs.Entity
+		handler          driver.Handler
+		policy           *ent.StoragePolicy
+		generalAuth      auth.Auth
+		settings         setting.Provider
+		hasher           hashid.Encoder
+		c                request.Client
+		l                logging.Logger
+		config           conf.ConfigProvider
+		mime             mime.MimeDetector
+		encryptorFactory encrypt.CryptorFactory
 
 		rsc io.ReadCloser
 		pos int64
@@ -197,20 +208,22 @@ func NewEntitySource(
 	l logging.Logger,
 	config conf.ConfigProvider,
 	mime mime.MimeDetector,
+	encryptorFactory encrypt.CryptorFactory,
 	opts ...EntitySourceOption,
 ) EntitySource {
 	s := &entitySource{
-		e:           e,
-		handler:     handler,
-		policy:      policy,
-		generalAuth: generalAuth,
-		settings:    settings,
-		hasher:      hasher,
-		c:           c,
-		config:      config,
-		l:           l,
-		mime:        mime,
-		o:           &EntitySourceOptions{},
+		e:                e,
+		handler:          handler,
+		policy:           policy,
+		generalAuth:      generalAuth,
+		settings:         settings,
+		hasher:           hasher,
+		c:                c,
+		config:           config,
+		l:                l,
+		mime:             mime,
+		encryptorFactory: encryptorFactory,
+		o:                &EntitySourceOptions{},
 	}
 	for _, opt := range opts {
 		opt.Apply(s.o)
@@ -237,7 +250,7 @@ func (f *entitySource) CloneToLocalSrc(t types.EntityType, src string) (EntitySo
 	policy := &ent.StoragePolicy{Type: types.PolicyTypeLocal}
 	handler := local.New(policy, f.l, f.config)
 
-	newSrc := NewEntitySource(e, handler, policy, f.generalAuth, f.settings, f.hasher, f.c, f.l, f.config, f.mime).(*entitySource)
+	newSrc := NewEntitySource(e, handler, policy, f.generalAuth, f.settings, f.hasher, f.c, f.l, f.config, f.mime, f.encryptorFactory).(*entitySource)
 	newSrc.o = f.o
 	return newSrc, nil
 }
@@ -328,6 +341,20 @@ func (f *entitySource) Serve(w http.ResponseWriter, r *http.Request, opts ...Ent
 				response.Header.Del("ETag")
 				response.Header.Del("Content-Disposition")
 				response.Header.Del("Cache-Control")
+
+				// If the response is successful, decrypt the body if needed
+				if response.StatusCode >= 200 && response.StatusCode < 300 {
+					// Parse offset from Content-Range header if present
+					offset := parseContentRangeOffset(response.Header.Get("Content-Range"))
+
+					body, err := f.getDecryptedRsc(response.Body, offset)
+					if err != nil {
+						return fmt.Errorf("failed to get decrypted rsc: %w", err)
+					}
+
+					response.Body = body
+				}
+
 				logging.Request(f.l,
 					false,
 					response.StatusCode,
@@ -554,7 +581,7 @@ func (f *entitySource) ShouldInternalProxy(opts ...EntitySourceOption) bool {
 	}
 	handlerCapability := f.handler.Capabilities()
 	return f.e.ID() == 0 || handlerCapability.StaticFeatures.Enabled(int(driver.HandlerCapabilityProxyRequired)) ||
-		f.policy.Settings.InternalProxy && !f.o.NoInternalProxy
+		(f.policy.Settings.InternalProxy || f.e.Encrypted()) && !f.o.NoInternalProxy
 }
 
 func (f *entitySource) Url(ctx context.Context, opts ...EntitySourceOption) (*EntityUrl, error) {
@@ -582,6 +609,7 @@ func (f *entitySource) Url(ctx context.Context, opts ...EntitySourceOption) (*En
 	// 1. Internal proxy is required by driver's definition
 	// 2. Internal proxy is enabled in Policy setting and not disabled by option
 	// 3. It's an empty entity.
+	// 4. The entity is encrypted and internal proxy not disabled by option
 	handlerCapability := f.handler.Capabilities()
 	if f.ShouldInternalProxy() {
 		siteUrl := f.settings.SiteURL(ctx)
@@ -655,6 +683,7 @@ func (f *entitySource) resetRequest() error {
 
 func (f *entitySource) getRsc(pos int64) (io.ReadCloser, error) {
 	// For inbound files, we can use the handler to open the file directly
+	var rsc io.ReadCloser
 	if f.IsLocal() {
 		file, err := f.handler.Open(f.o.Ctx, f.e.Source())
 		if err != nil {
@@ -670,46 +699,75 @@ func (f *entitySource) getRsc(pos int64) (io.ReadCloser, error) {
 
 		if f.o.SpeedLimit > 0 {
 			bucket := ratelimit.NewBucketWithRate(float64(f.o.SpeedLimit), f.o.SpeedLimit)
-			return lrs{file, ratelimit.Reader(file, bucket)}, nil
+			rsc = lrs{file, ratelimit.Reader(file, bucket)}
 		} else {
-			return file, nil
+			rsc = file
 		}
-
-	}
-
-	var urlStr string
-	now := time.Now()
-
-	// Check if we have a valid cached URL and expiry
-	if f.cachedUrl != "" && now.Before(f.cachedExpiry.Add(-time.Minute)) {
-		// Use cached URL if it's still valid (with 1 minute buffer before expiry)
-		urlStr = f.cachedUrl
 	} else {
-		// Generate new URL and cache it
-		expire := now.Add(defaultUrlExpire)
-		u, err := f.Url(driver.WithForcePublicEndpoint(f.o.Ctx, false), WithNoInternalProxy(), WithExpire(&expire))
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate download url: %w", err)
+		var urlStr string
+		now := time.Now()
+
+		// Check if we have a valid cached URL and expiry
+		if f.cachedUrl != "" && now.Before(f.cachedExpiry.Add(-time.Minute)) {
+			// Use cached URL if it's still valid (with 1 minute buffer before expiry)
+			urlStr = f.cachedUrl
+		} else {
+			// Generate new URL and cache it
+			expire := now.Add(defaultUrlExpire)
+			u, err := f.Url(driver.WithForcePublicEndpoint(f.o.Ctx, false), WithNoInternalProxy(), WithExpire(&expire))
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate download url: %w", err)
+			}
+
+			// Cache the URL and expiry
+			f.cachedUrl = u.Url
+			f.cachedExpiry = expire
+			urlStr = u.Url
 		}
 
-		// Cache the URL and expiry
-		f.cachedUrl = u.Url
-		f.cachedExpiry = expire
-		urlStr = u.Url
+		h := http.Header{}
+		h.Set("Range", fmt.Sprintf("bytes=%d-", pos))
+		resp := f.c.Request(http.MethodGet, urlStr, nil,
+			request.WithContext(f.o.Ctx),
+			request.WithLogger(f.l),
+			request.WithHeader(h),
+		).CheckHTTPResponse(http.StatusOK, http.StatusPartialContent)
+		if resp.Err != nil {
+			return nil, fmt.Errorf("failed to request download url: %w", resp.Err)
+		}
+
+		rsc = resp.Response.Body
 	}
 
-	h := http.Header{}
-	h.Set("Range", fmt.Sprintf("bytes=%d-", pos))
-	resp := f.c.Request(http.MethodGet, urlStr, nil,
-		request.WithContext(f.o.Ctx),
-		request.WithLogger(f.l),
-		request.WithHeader(h),
-	).CheckHTTPResponse(http.StatusOK, http.StatusPartialContent)
-	if resp.Err != nil {
-		return nil, fmt.Errorf("failed to request download url: %w", resp.Err)
+	var err error
+	rsc, err = f.getDecryptedRsc(rsc, pos)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get decrypted rsc: %w", err)
 	}
 
-	return resp.Response.Body, nil
+	return rsc, nil
+}
+
+func (f *entitySource) getDecryptedRsc(rsc io.ReadCloser, pos int64) (io.ReadCloser, error) {
+	props := f.e.Props()
+	if props != nil && props.EncryptMetadata != nil && !f.o.DisableCryptor {
+		cryptor, err := f.encryptorFactory(props.EncryptMetadata.Algorithm)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create decryptor: %w", err)
+		}
+		err = cryptor.LoadMetadata(f.o.Ctx, props.EncryptMetadata)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load metadata: %w", err)
+		}
+
+		if err := cryptor.SetSource(rsc, nil, f.e.Size(), pos); err != nil {
+			return nil, fmt.Errorf("failed to set source: %w", err)
+		}
+
+		return cryptor, nil
+	}
+
+	return rsc, nil
 }
 
 // capExpireTime make sure expire time is not too long or too short (if min or max is set)
@@ -1000,6 +1058,33 @@ func sumRangesSize(ranges []httpRange) (size int64) {
 		size += ra.length
 	}
 	return
+}
+
+// parseContentRangeOffset parses the start offset from a Content-Range header.
+// Content-Range format: "bytes start-end/total" (e.g., "bytes 100-200/1000")
+// Returns 0 if the header is empty, invalid, or cannot be parsed.
+func parseContentRangeOffset(contentRange string) int64 {
+	if contentRange == "" {
+		return 0
+	}
+
+	// Content-Range format: "bytes start-end/total"
+	if !strings.HasPrefix(contentRange, "bytes ") {
+		return 0
+	}
+
+	rangeSpec := strings.TrimPrefix(contentRange, "bytes ")
+	dashPos := strings.Index(rangeSpec, "-")
+	if dashPos <= 0 {
+		return 0
+	}
+
+	start, err := strconv.ParseInt(rangeSpec[:dashPos], 10, 64)
+	if err != nil {
+		return 0
+	}
+
+	return start
 }
 
 // countingWriter counts how many bytes have been written to it.

@@ -103,6 +103,8 @@ type (
 		QiniuUploadCdn bool `json:"qiniu_upload_cdn,omitempty"`
 		// ChunkConcurrency the number of chunks to upload concurrently.
 		ChunkConcurrency int `json:"chunk_concurrency,omitempty"`
+		// Whether to enable file encryption.
+		Encryption bool `json:"encryption,omitempty"`
 	}
 
 	FileType         int
@@ -154,8 +156,18 @@ type (
 		MasterSiteVersion string `json:"master_site_version,omitempty"`
 	}
 
-	EntityRecycleOption struct {
-		UnlinkOnly bool `json:"unlink_only,omitempty"`
+	EntityProps struct {
+		UnlinkOnly      bool             `json:"unlink_only,omitempty"`
+		EncryptMetadata *EncryptMetadata `json:"encrypt_metadata,omitempty"`
+	}
+
+	Cipher string
+
+	EncryptMetadata struct {
+		Algorithm    Cipher `json:"algorithm"`
+		Key          []byte `json:"key"`
+		KeyPlainText []byte `json:"key_plain_text,omitempty"`
+		IV           []byte `json:"iv"`
 	}
 
 	DavAccountProps struct {
@@ -346,4 +358,8 @@ const (
 	ProfilePublicShareOnly = ShareLinksInProfileLevel("")
 	ProfileAllShare        = ShareLinksInProfileLevel("all_share")
 	ProfileHideShare       = ShareLinksInProfileLevel("hide_share")
+)
+
+const (
+	CipherAES256CTR Cipher = "aes-256-ctr"
 )

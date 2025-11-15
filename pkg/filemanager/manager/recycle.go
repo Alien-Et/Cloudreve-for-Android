@@ -222,7 +222,7 @@ func (m *manager) RecycleEntities(ctx context.Context, force bool, entityIDs ...
 
 			toBeDeletedSrc := lo.Map(lo.Filter(chunk, func(item fs.Entity, index int) bool {
 				// Only delete entities that are not marked as "unlink only"
-				return item.Model().RecycleOptions == nil || !item.Model().RecycleOptions.UnlinkOnly
+				return item.Model().Props == nil || !item.Model().Props.UnlinkOnly
 			}), func(entity fs.Entity, index int) string {
 				return entity.Source()
 			})

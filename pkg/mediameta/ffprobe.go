@@ -100,7 +100,7 @@ func (f *ffprobeExtractor) Extract(ctx context.Context, ext string, source entit
 	}
 
 	var input string
-	if source.IsLocal() {
+	if source.IsLocal() && !source.Entity().Encrypted() {
 		input = source.LocalPath(ctx)
 	} else {
 		expire := time.Now().Add(UrlExpire)

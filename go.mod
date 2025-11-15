@@ -1,13 +1,12 @@
 module github.com/cloudreve/Cloudreve/v4
 
-go 1.23.0
+go 1.24.0
 
-toolchain go1.24.7
+toolchain go1.24.10
 
 require (
 	entgo.io/ent v0.13.0
 	github.com/Masterminds/semver/v3 v3.3.1
-	github.com/abslant/gzip v0.0.9
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.3.0
 	github.com/aws/aws-sdk-go v1.31.5
 	github.com/bodgit/sevenzip v1.6.0
@@ -20,12 +19,13 @@ require (
 	github.com/dsoprea/go-tiff-image-structure v0.0.0-20221003165014-8ecc4f52edca
 	github.com/dsoprea/go-utility v0.0.0-20200711062821-fab8125e9bdf
 	github.com/fatih/color v1.18.0
-	github.com/gin-contrib/cors v1.3.0
+	github.com/gin-contrib/cors v1.6.0
+	github.com/gin-contrib/gzip v1.2.4
 	github.com/gin-contrib/sessions v1.0.2
 	github.com/gin-contrib/static v0.0.0-20191128031702-f81c604d8ac2
-	github.com/gin-gonic/gin v1.10.0
+	github.com/gin-gonic/gin v1.11.0
 	github.com/go-ini/ini v1.50.0
-	github.com/go-playground/validator/v10 v10.20.0
+	github.com/go-playground/validator/v10 v10.28.0
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/go-webauthn/webauthn v0.11.2
 	github.com/gofrs/uuid v4.0.0+incompatible
@@ -52,16 +52,16 @@ require (
 	github.com/speps/go-hashids v2.0.0+incompatible
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.11.1
 	github.com/tencentyun/cos-go-sdk-v5 v0.7.54
 	github.com/ua-parser/uap-go v0.0.0-20250213224047-9c035f085b90
 	github.com/upyun/go-sdk v2.1.0+incompatible
-	github.com/wneessen/go-mail v0.6.2
+	github.com/wneessen/go-mail v0.7.1
 	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e
-	golang.org/x/image v0.0.0-20211028202545-6944b10bf410
-	golang.org/x/text v0.23.0
+	golang.org/x/image v0.18.0
+	golang.org/x/text v0.30.0
 	golang.org/x/time v0.5.0
-	golang.org/x/tools v0.24.0
+	golang.org/x/tools v0.38.0
 	modernc.org/sqlite v1.30.0
 )
 
@@ -75,11 +75,11 @@ require (
 	github.com/bodgit/plumbing v1.3.0 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
-	github.com/bytedance/sonic v1.11.6 // indirect
-	github.com/bytedance/sonic/loader v0.1.1 // indirect
+	github.com/bytedance/gopkg v0.1.3 // indirect
+	github.com/bytedance/sonic v1.14.1 // indirect
+	github.com/bytedance/sonic/loader v0.3.0 // indirect
 	github.com/clbanning/mxj v1.8.4 // indirect
-	github.com/cloudwego/base64x v0.1.4 // indirect
-	github.com/cloudwego/iasm v0.2.0 // indirect
+	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
@@ -90,18 +90,19 @@ require (
 	github.com/dsoprea/go-utility/v2 v2.0.0-20221003172846-a3e1774ef349 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
-	github.com/gin-contrib/sse v0.1.0 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.10 // indirect
+	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-openapi/inflect v0.19.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-webauthn/x v0.1.14 // indirect
 	github.com/go-xmlfmt/xmlfmt v0.0.0-20191208150333-d5b6f63a941b // indirect
-	github.com/goccy/go-json v0.10.2 // indirect
+	github.com/goccy/go-json v0.10.5 // indirect
+	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-tpm v0.9.1 // indirect
 	github.com/gorilla/context v1.1.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -114,7 +115,7 @@ require (
 	github.com/jmespath/go-jmespath v0.3.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
+	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
@@ -129,25 +130,27 @@ require (
 	github.com/mozillazg/go-httpheader v0.4.0 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/nwaples/rardecode/v2 v2.1.0 // indirect
-	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/quic-go/qpack v0.5.1 // indirect
+	github.com/quic-go/quic-go v0.55.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sorairolake/lzip-go v0.3.5 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
-	github.com/ugorji/go/codec v1.2.12 // indirect
+	github.com/ugorji/go/codec v1.3.0 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/zclconf/go-cty v1.8.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
-	golang.org/x/arch v0.8.0 // indirect
-	golang.org/x/crypto v0.36.0 // indirect
-	golang.org/x/mod v0.20.0 // indirect
-	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/sync v0.12.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	google.golang.org/protobuf v1.34.2 // indirect
+	golang.org/x/arch v0.22.0 // indirect
+	golang.org/x/crypto v0.43.0 // indirect
+	golang.org/x/mod v0.29.0 // indirect
+	golang.org/x/net v0.46.0 // indirect
+	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/sys v0.37.0 // indirect
+	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
