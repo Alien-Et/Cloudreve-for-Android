@@ -87,8 +87,8 @@ func NewNodePool(ctx context.Context, l logging.Logger, config conf.ConfigProvid
 
 func (p *weightedNodePool) Get(ctx context.Context, capability types.NodeCapability, preferred int) (Node, error) {
 	l := logging.FromContext(ctx)
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
 	nodes, ok := p.nodes[capability]
 	if !ok || len(nodes) == 0 {

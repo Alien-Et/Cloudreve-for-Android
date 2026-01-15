@@ -14,6 +14,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/ent/davaccount"
 	"github.com/cloudreve/Cloudreve/v4/ent/entity"
 	"github.com/cloudreve/Cloudreve/v4/ent/file"
+	"github.com/cloudreve/Cloudreve/v4/ent/fsevent"
 	"github.com/cloudreve/Cloudreve/v4/ent/group"
 	"github.com/cloudreve/Cloudreve/v4/ent/passkey"
 	"github.com/cloudreve/Cloudreve/v4/ent/share"
@@ -250,6 +251,21 @@ func (uc *UserCreate) AddTasks(t ...*Task) *UserCreate {
 		ids[i] = t[i].ID
 	}
 	return uc.AddTaskIDs(ids...)
+}
+
+// AddFseventIDs adds the "fsevents" edge to the FsEvent entity by IDs.
+func (uc *UserCreate) AddFseventIDs(ids ...int) *UserCreate {
+	uc.mutation.AddFseventIDs(ids...)
+	return uc
+}
+
+// AddFsevents adds the "fsevents" edges to the FsEvent entity.
+func (uc *UserCreate) AddFsevents(f ...*FsEvent) *UserCreate {
+	ids := make([]int, len(f))
+	for i := range f {
+		ids[i] = f[i].ID
+	}
+	return uc.AddFseventIDs(ids...)
 }
 
 // AddEntityIDs adds the "entities" edge to the Entity entity by IDs.
@@ -542,6 +558,22 @@ func (uc *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(task.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := uc.mutation.FseventsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.FseventsTable,
+			Columns: []string{user.FseventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(fsevent.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

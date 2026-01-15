@@ -600,7 +600,7 @@ func withUserEagerLoading(ctx context.Context, q *ent.UserQuery) *ent.UserQuery 
 
 func digestPassword(password string) (string, error) {
 	//生成16位 Salt
-	salt := util.RandStringRunes(16)
+	salt := util.RandStringRunesCrypto(32)
 
 	//计算 Salt 和密码组合的SHA1摘要
 	hash := sha256.New()

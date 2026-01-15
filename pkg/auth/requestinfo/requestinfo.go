@@ -22,4 +22,6 @@ type RequestInfo struct {
 	Host      string
 	IP        string
 	UserAgent string
+	// ID of sync client
+	ClientID string
 }

@@ -198,7 +198,7 @@ type FileClient interface {
 	// SoftDelete soft-deletes a file, also renaming it to a random name
 	SoftDelete(ctx context.Context, file *ent.File) error
 	// SetPrimaryEntity sets primary entity of a file
-	SetPrimaryEntity(ctx context.Context, file *ent.File, entityID int) error
+	SetPrimaryEntity(ctx context.Context, file *ent.File, entity *ent.Entity) error
 	// UnlinkEntity unlinks an entity from a file
 	UnlinkEntity(ctx context.Context, entity *ent.Entity, file *ent.File, owner *ent.User) (StorageDiff, error)
 	// CreateDirectLink creates a direct link for a file
@@ -743,8 +743,8 @@ func (f *fileClient) UpgradePlaceholder(ctx context.Context, file *ent.File, mod
 	return nil
 }
 
-func (f *fileClient) SetPrimaryEntity(ctx context.Context, file *ent.File, entityID int) error {
-	return f.client.File.UpdateOne(file).SetPrimaryEntity(entityID).Exec(ctx)
+func (f *fileClient) SetPrimaryEntity(ctx context.Context, file *ent.File, entity *ent.Entity) error {
+	return f.client.File.UpdateOne(file).SetPrimaryEntity(entity.ID).SetSize(entity.Size).Exec(ctx)
 }
 
 func (f *fileClient) CreateFile(ctx context.Context, root *ent.File, args *CreateFileParameters) (*ent.File, *ent.Entity, StorageDiff, error) {

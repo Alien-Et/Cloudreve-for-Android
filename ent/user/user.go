@@ -53,6 +53,8 @@ const (
 	EdgePasskey = "passkey"
 	// EdgeTasks holds the string denoting the tasks edge name in mutations.
 	EdgeTasks = "tasks"
+	// EdgeFsevents holds the string denoting the fsevents edge name in mutations.
+	EdgeFsevents = "fsevents"
 	// EdgeEntities holds the string denoting the entities edge name in mutations.
 	EdgeEntities = "entities"
 	// Table holds the table name of the user in the database.
@@ -99,6 +101,13 @@ const (
 	TasksInverseTable = "tasks"
 	// TasksColumn is the table column denoting the tasks relation/edge.
 	TasksColumn = "user_tasks"
+	// FseventsTable is the table that holds the fsevents relation/edge.
+	FseventsTable = "fs_events"
+	// FseventsInverseTable is the table name for the FsEvent entity.
+	// It exists in this package in order to avoid circular dependency with the "fsevent" package.
+	FseventsInverseTable = "fs_events"
+	// FseventsColumn is the table column denoting the fsevents relation/edge.
+	FseventsColumn = "user_fsevent"
 	// EntitiesTable is the table that holds the entities relation/edge.
 	EntitiesTable = "entities"
 	// EntitiesInverseTable is the table name for the Entity entity.
@@ -327,6 +336,20 @@ func ByTasks(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByFseventsCount orders the results by fsevents count.
+func ByFseventsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newFseventsStep(), opts...)
+	}
+}
+
+// ByFsevents orders the results by fsevents terms.
+func ByFsevents(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newFseventsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByEntitiesCount orders the results by entities count.
 func ByEntitiesCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -380,6 +403,13 @@ func newTasksStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(TasksInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, TasksTable, TasksColumn),
+	)
+}
+func newFseventsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(FseventsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, FseventsTable, FseventsColumn),
 	)
 }
 func newEntitiesStep() *sqlgraph.Step {

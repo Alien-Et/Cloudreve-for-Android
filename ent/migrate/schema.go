@@ -160,6 +160,30 @@ var (
 			},
 		},
 	}
+	// FsEventsColumns holds the columns for the "fs_events" table.
+	FsEventsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"mysql": "datetime"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"mysql": "datetime"}},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"mysql": "datetime"}},
+		{Name: "event", Type: field.TypeString, Size: 2147483647},
+		{Name: "subscriber", Type: field.TypeUUID},
+		{Name: "user_fsevent", Type: field.TypeInt, Nullable: true},
+	}
+	// FsEventsTable holds the schema information for the "fs_events" table.
+	FsEventsTable = &schema.Table{
+		Name:       "fs_events",
+		Columns:    FsEventsColumns,
+		PrimaryKey: []*schema.Column{FsEventsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "fs_events_users_fsevents",
+				Columns:    []*schema.Column{FsEventsColumns[6]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+	}
 	// GroupsColumns holds the columns for the "groups" table.
 	GroupsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -444,6 +468,7 @@ var (
 		DirectLinksTable,
 		EntitiesTable,
 		FilesTable,
+		FsEventsTable,
 		GroupsTable,
 		MetadataTable,
 		NodesTable,
@@ -465,6 +490,7 @@ func init() {
 	FilesTable.ForeignKeys[0].RefTable = FilesTable
 	FilesTable.ForeignKeys[1].RefTable = StoragePoliciesTable
 	FilesTable.ForeignKeys[2].RefTable = UsersTable
+	FsEventsTable.ForeignKeys[0].RefTable = UsersTable
 	GroupsTable.ForeignKeys[0].RefTable = StoragePoliciesTable
 	MetadataTable.ForeignKeys[0].RefTable = FilesTable
 	PasskeysTable.ForeignKeys[0].RefTable = UsersTable

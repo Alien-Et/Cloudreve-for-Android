@@ -355,6 +355,8 @@ func (f *DBFS) CompleteUpload(ctx context.Context, session *fs.UploadSession) (f
 		}
 	}
 
+	f.emitFileModified(ctx, filePrivate)
+
 	file, err = f.Get(ctx, session.Props.Uri, WithFileEntities(), WithNotRoot())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get updated file: %w", err)

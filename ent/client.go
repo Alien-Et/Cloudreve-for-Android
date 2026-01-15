@@ -19,6 +19,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/ent/directlink"
 	"github.com/cloudreve/Cloudreve/v4/ent/entity"
 	"github.com/cloudreve/Cloudreve/v4/ent/file"
+	"github.com/cloudreve/Cloudreve/v4/ent/fsevent"
 	"github.com/cloudreve/Cloudreve/v4/ent/group"
 	"github.com/cloudreve/Cloudreve/v4/ent/metadata"
 	"github.com/cloudreve/Cloudreve/v4/ent/node"
@@ -45,6 +46,8 @@ type Client struct {
 	Entity *EntityClient
 	// File is the client for interacting with the File builders.
 	File *FileClient
+	// FsEvent is the client for interacting with the FsEvent builders.
+	FsEvent *FsEventClient
 	// Group is the client for interacting with the Group builders.
 	Group *GroupClient
 	// Metadata is the client for interacting with the Metadata builders.
@@ -78,6 +81,7 @@ func (c *Client) init() {
 	c.DirectLink = NewDirectLinkClient(c.config)
 	c.Entity = NewEntityClient(c.config)
 	c.File = NewFileClient(c.config)
+	c.FsEvent = NewFsEventClient(c.config)
 	c.Group = NewGroupClient(c.config)
 	c.Metadata = NewMetadataClient(c.config)
 	c.Node = NewNodeClient(c.config)
@@ -183,6 +187,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		DirectLink:    NewDirectLinkClient(cfg),
 		Entity:        NewEntityClient(cfg),
 		File:          NewFileClient(cfg),
+		FsEvent:       NewFsEventClient(cfg),
 		Group:         NewGroupClient(cfg),
 		Metadata:      NewMetadataClient(cfg),
 		Node:          NewNodeClient(cfg),
@@ -215,6 +220,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		DirectLink:    NewDirectLinkClient(cfg),
 		Entity:        NewEntityClient(cfg),
 		File:          NewFileClient(cfg),
+		FsEvent:       NewFsEventClient(cfg),
 		Group:         NewGroupClient(cfg),
 		Metadata:      NewMetadataClient(cfg),
 		Node:          NewNodeClient(cfg),
@@ -253,8 +259,8 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.DavAccount, c.DirectLink, c.Entity, c.File, c.Group, c.Metadata, c.Node,
-		c.Passkey, c.Setting, c.Share, c.StoragePolicy, c.Task, c.User,
+		c.DavAccount, c.DirectLink, c.Entity, c.File, c.FsEvent, c.Group, c.Metadata,
+		c.Node, c.Passkey, c.Setting, c.Share, c.StoragePolicy, c.Task, c.User,
 	} {
 		n.Use(hooks...)
 	}
@@ -264,8 +270,8 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.DavAccount, c.DirectLink, c.Entity, c.File, c.Group, c.Metadata, c.Node,
-		c.Passkey, c.Setting, c.Share, c.StoragePolicy, c.Task, c.User,
+		c.DavAccount, c.DirectLink, c.Entity, c.File, c.FsEvent, c.Group, c.Metadata,
+		c.Node, c.Passkey, c.Setting, c.Share, c.StoragePolicy, c.Task, c.User,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -282,6 +288,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Entity.mutate(ctx, m)
 	case *FileMutation:
 		return c.File.mutate(ctx, m)
+	case *FsEventMutation:
+		return c.FsEvent.mutate(ctx, m)
 	case *GroupMutation:
 		return c.Group.mutate(ctx, m)
 	case *MetadataMutation:
@@ -1049,6 +1057,157 @@ func (c *FileClient) mutate(ctx context.Context, m *FileMutation) (Value, error)
 		return (&FileDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown File mutation op: %q", m.Op())
+	}
+}
+
+// FsEventClient is a client for the FsEvent schema.
+type FsEventClient struct {
+	config
+}
+
+// NewFsEventClient returns a client for the FsEvent from the given config.
+func NewFsEventClient(c config) *FsEventClient {
+	return &FsEventClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `fsevent.Hooks(f(g(h())))`.
+func (c *FsEventClient) Use(hooks ...Hook) {
+	c.hooks.FsEvent = append(c.hooks.FsEvent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `fsevent.Intercept(f(g(h())))`.
+func (c *FsEventClient) Intercept(interceptors ...Interceptor) {
+	c.inters.FsEvent = append(c.inters.FsEvent, interceptors...)
+}
+
+// Create returns a builder for creating a FsEvent entity.
+func (c *FsEventClient) Create() *FsEventCreate {
+	mutation := newFsEventMutation(c.config, OpCreate)
+	return &FsEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of FsEvent entities.
+func (c *FsEventClient) CreateBulk(builders ...*FsEventCreate) *FsEventCreateBulk {
+	return &FsEventCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *FsEventClient) MapCreateBulk(slice any, setFunc func(*FsEventCreate, int)) *FsEventCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &FsEventCreateBulk{err: fmt.Errorf("calling to FsEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*FsEventCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &FsEventCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for FsEvent.
+func (c *FsEventClient) Update() *FsEventUpdate {
+	mutation := newFsEventMutation(c.config, OpUpdate)
+	return &FsEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *FsEventClient) UpdateOne(fe *FsEvent) *FsEventUpdateOne {
+	mutation := newFsEventMutation(c.config, OpUpdateOne, withFsEvent(fe))
+	return &FsEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *FsEventClient) UpdateOneID(id int) *FsEventUpdateOne {
+	mutation := newFsEventMutation(c.config, OpUpdateOne, withFsEventID(id))
+	return &FsEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for FsEvent.
+func (c *FsEventClient) Delete() *FsEventDelete {
+	mutation := newFsEventMutation(c.config, OpDelete)
+	return &FsEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *FsEventClient) DeleteOne(fe *FsEvent) *FsEventDeleteOne {
+	return c.DeleteOneID(fe.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *FsEventClient) DeleteOneID(id int) *FsEventDeleteOne {
+	builder := c.Delete().Where(fsevent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &FsEventDeleteOne{builder}
+}
+
+// Query returns a query builder for FsEvent.
+func (c *FsEventClient) Query() *FsEventQuery {
+	return &FsEventQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeFsEvent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a FsEvent entity by its id.
+func (c *FsEventClient) Get(ctx context.Context, id int) (*FsEvent, error) {
+	return c.Query().Where(fsevent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *FsEventClient) GetX(ctx context.Context, id int) *FsEvent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryUser queries the user edge of a FsEvent.
+func (c *FsEventClient) QueryUser(fe *FsEvent) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := fe.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(fsevent.Table, fsevent.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, fsevent.UserTable, fsevent.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(fe.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *FsEventClient) Hooks() []Hook {
+	hooks := c.hooks.FsEvent
+	return append(hooks[:len(hooks):len(hooks)], fsevent.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *FsEventClient) Interceptors() []Interceptor {
+	inters := c.inters.FsEvent
+	return append(inters[:len(inters):len(inters)], fsevent.Interceptors[:]...)
+}
+
+func (c *FsEventClient) mutate(ctx context.Context, m *FsEventMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&FsEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&FsEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&FsEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&FsEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown FsEvent mutation op: %q", m.Op())
 	}
 }
 
@@ -2528,6 +2687,22 @@ func (c *UserClient) QueryTasks(u *User) *TaskQuery {
 	return query
 }
 
+// QueryFsevents queries the fsevents edge of a User.
+func (c *UserClient) QueryFsevents(u *User) *FsEventQuery {
+	query := (&FsEventClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := u.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(fsevent.Table, fsevent.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.FseventsTable, user.FseventsColumn),
+		)
+		fromV = sqlgraph.Neighbors(u.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryEntities queries the entities edge of a User.
 func (c *UserClient) QueryEntities(u *User) *EntityQuery {
 	query := (&EntityClient{config: c.config}).Query()
@@ -2574,12 +2749,12 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		DavAccount, DirectLink, Entity, File, Group, Metadata, Node, Passkey, Setting,
-		Share, StoragePolicy, Task, User []ent.Hook
+		DavAccount, DirectLink, Entity, File, FsEvent, Group, Metadata, Node, Passkey,
+		Setting, Share, StoragePolicy, Task, User []ent.Hook
 	}
 	inters struct {
-		DavAccount, DirectLink, Entity, File, Group, Metadata, Node, Passkey, Setting,
-		Share, StoragePolicy, Task, User []ent.Interceptor
+		DavAccount, DirectLink, Entity, File, FsEvent, Group, Metadata, Node, Passkey,
+		Setting, Share, StoragePolicy, Task, User []ent.Interceptor
 	}
 )
 

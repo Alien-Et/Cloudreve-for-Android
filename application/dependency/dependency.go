@@ -18,6 +18,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/pkg/credmanager"
 	"github.com/cloudreve/Cloudreve/v4/pkg/email"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/encrypt"
+	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/eventhub"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/fs/mime"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/lock"
 	"github.com/cloudreve/Cloudreve/v4/pkg/hashid"
@@ -134,6 +135,8 @@ type Dep interface {
 	MasterEncryptKeyVault(ctx context.Context) encrypt.MasterEncryptKeyVault
 	// EncryptorFactory Get a new encrypt.CryptorFactory instance.
 	EncryptorFactory(ctx context.Context) encrypt.CryptorFactory
+	// EventHub Get a singleton eventhub.EventHub instance for event publishing.
+	EventHub() eventhub.EventHub
 }
 
 type dependency struct {
@@ -156,6 +159,7 @@ type dependency struct {
 	nodeClient            inventory.NodeClient
 	davAccountClient      inventory.DavAccountClient
 	directLinkClient      inventory.DirectLinkClient
+	fsEventClient         inventory.FsEventClient
 	emailClient           email.Driver
 	generalAuth           auth.Auth
 	hashidEncoder         hashid.Encoder
@@ -179,6 +183,7 @@ type dependency struct {
 	parser                *uaparser.Parser
 	cron                  *cron.Cron
 	masterEncryptKeyVault encrypt.MasterEncryptKeyVault
+	eventHub              eventhub.EventHub
 
 	configPath        string
 	isPro             bool
@@ -362,6 +367,21 @@ func (d *dependency) NavigatorStateKV() cache.Driver {
 	}
 	d.navigatorStateKv = cache.NewMemoStore("", d.Logger())
 	return d.navigatorStateKv
+}
+
+func (d *dependency) EventHub() eventhub.EventHub {
+	if d.eventHub != nil {
+		return d.eventHub
+	}
+	d.eventHub = eventhub.NewEventHub(d.UserClient(), d.FsEventClient())
+	return d.eventHub
+}
+
+func (d *dependency) FsEventClient() inventory.FsEventClient {
+	if d.fsEventClient != nil {
+		return d.fsEventClient
+	}
+	return inventory.NewFsEventClient(d.DBClient(), d.ConfigProvider().Database().Type)
 }
 
 func (d *dependency) SettingClient() inventory.SettingClient {
@@ -857,6 +877,14 @@ func (d *dependency) Shutdown(ctx context.Context) error {
 		wg.Add(1)
 		go func() {
 			d.remoteDownloadQueue.Shutdown()
+			defer wg.Done()
+		}()
+	}
+
+	if d.eventHub != nil {
+		wg.Add(1)
+		go func() {
+			d.eventHub.Close()
 			defer wg.Done()
 		}()
 	}

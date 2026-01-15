@@ -727,6 +727,13 @@ func initMasterRouter(dep dependency.Dep) *gin.Engine {
 				controllers.FromJSON[explorer.PatchViewService](explorer.PatchViewParameterCtx{}),
 				controllers.PatchView,
 			)
+
+			// Server event push
+			file.GET("events",
+				middleware.LoginRequired(),
+				controllers.FromQuery[explorer.ExplorerEventService](explorer.ExplorerEventParamCtx{}),
+				controllers.HandleExplorerEventsPush,
+			)
 		}
 
 		// 分享相关

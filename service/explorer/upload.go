@@ -30,6 +30,7 @@ type (
 		Metadata            map[string]string `json:"metadata" binding:"max=256"`
 		EntityType          string            `json:"entity_type" binding:"eq=|eq=live_photo|eq=version"`
 		EncryptionSupported []types.Cipher    `json:"encryption_supported"`
+		Previous            string            `form:"previous"`
 	}
 )
 
@@ -56,9 +57,12 @@ func (service *CreateUploadSessionService) Create(c context.Context) (*UploadSes
 	}
 
 	hasher := dep.HashIDEncoder()
-	policyId, err := hasher.Decode(service.PolicyID, hashid.PolicyID)
-	if err != nil {
-		return nil, serializer.NewError(serializer.CodeParamErr, "unknown policy id", err)
+	policyId := 0
+	if service.PolicyID != "" {
+		policyId, err = hasher.Decode(service.PolicyID, hashid.PolicyID)
+		if err != nil {
+			return nil, serializer.NewError(serializer.CodeParamErr, "unknown policy id", err)
+		}
 	}
 
 	uploadRequest := &fs.UploadRequest{
@@ -66,6 +70,7 @@ func (service *CreateUploadSessionService) Create(c context.Context) (*UploadSes
 			Uri:  uri,
 			Size: service.Size,
 
+			PreviousVersion:        service.Previous,
 			MimeType:               service.MimeType,
 			Metadata:               service.Metadata,
 			EntityType:             entityType,

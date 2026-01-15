@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"time"
 
@@ -41,13 +42,14 @@ func NewServer(dep dependency.Dep) Server {
 }
 
 type server struct {
-	dep       dependency.Dep
-	logger    logging.Logger
-	dbClient  *ent.Client
-	config    conf.ConfigProvider
-	server    *http.Server
-	kv        cache.Driver
-	mailQueue email.Driver
+	dep         dependency.Dep
+	logger      logging.Logger
+	dbClient    *ent.Client
+	config      conf.ConfigProvider
+	server      *http.Server
+	pprofServer *http.Server
+	kv          cache.Driver
+	mailQueue   email.Driver
 }
 
 func (s *server) PrintBanner() {
@@ -127,6 +129,20 @@ func (s *server) Start() error {
 	api.TrustedPlatform = s.config.System().ProxyHeader
 	s.server = &http.Server{Handler: api}
 
+	// Start pprof server if configured
+	if pprofAddr := s.config.System().Pprof; pprofAddr != "" {
+		s.pprofServer = &http.Server{
+			Addr:    pprofAddr,
+			Handler: http.DefaultServeMux,
+		}
+		go func() {
+			s.logger.Info("pprof server listening on %q", pprofAddr)
+			if err := s.pprofServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				s.logger.Error("pprof server error: %s", err)
+			}
+		}()
+	}
+
 	// 如果启用了SSL
 	if s.config.SSL().CertPath != "" {
 		s.logger.Info("Listening to %q", s.config.SSL().Listen)
@@ -178,11 +194,20 @@ func (s *server) Close() {
 		defer cancel()
 	}
 
+	s.dep.EventHub().Close()
+
 	// Shutdown http server
 	if s.server != nil {
 		err := s.server.Shutdown(ctx)
 		if err != nil {
 			s.logger.Error("Failed to shutdown server: %s", err)
+		}
+	}
+
+	// Shutdown pprof server
+	if s.pprofServer != nil {
+		if err := s.pprofServer.Shutdown(ctx); err != nil {
+			s.logger.Error("Failed to shutdown pprof server: %s", err)
 		}
 	}
 

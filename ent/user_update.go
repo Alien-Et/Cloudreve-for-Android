@@ -14,6 +14,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/ent/davaccount"
 	"github.com/cloudreve/Cloudreve/v4/ent/entity"
 	"github.com/cloudreve/Cloudreve/v4/ent/file"
+	"github.com/cloudreve/Cloudreve/v4/ent/fsevent"
 	"github.com/cloudreve/Cloudreve/v4/ent/group"
 	"github.com/cloudreve/Cloudreve/v4/ent/passkey"
 	"github.com/cloudreve/Cloudreve/v4/ent/predicate"
@@ -297,6 +298,21 @@ func (uu *UserUpdate) AddTasks(t ...*Task) *UserUpdate {
 	return uu.AddTaskIDs(ids...)
 }
 
+// AddFseventIDs adds the "fsevents" edge to the FsEvent entity by IDs.
+func (uu *UserUpdate) AddFseventIDs(ids ...int) *UserUpdate {
+	uu.mutation.AddFseventIDs(ids...)
+	return uu
+}
+
+// AddFsevents adds the "fsevents" edges to the FsEvent entity.
+func (uu *UserUpdate) AddFsevents(f ...*FsEvent) *UserUpdate {
+	ids := make([]int, len(f))
+	for i := range f {
+		ids[i] = f[i].ID
+	}
+	return uu.AddFseventIDs(ids...)
+}
+
 // AddEntityIDs adds the "entities" edge to the Entity entity by IDs.
 func (uu *UserUpdate) AddEntityIDs(ids ...int) *UserUpdate {
 	uu.mutation.AddEntityIDs(ids...)
@@ -426,6 +442,27 @@ func (uu *UserUpdate) RemoveTasks(t ...*Task) *UserUpdate {
 		ids[i] = t[i].ID
 	}
 	return uu.RemoveTaskIDs(ids...)
+}
+
+// ClearFsevents clears all "fsevents" edges to the FsEvent entity.
+func (uu *UserUpdate) ClearFsevents() *UserUpdate {
+	uu.mutation.ClearFsevents()
+	return uu
+}
+
+// RemoveFseventIDs removes the "fsevents" edge to FsEvent entities by IDs.
+func (uu *UserUpdate) RemoveFseventIDs(ids ...int) *UserUpdate {
+	uu.mutation.RemoveFseventIDs(ids...)
+	return uu
+}
+
+// RemoveFsevents removes "fsevents" edges to FsEvent entities.
+func (uu *UserUpdate) RemoveFsevents(f ...*FsEvent) *UserUpdate {
+	ids := make([]int, len(f))
+	for i := range f {
+		ids[i] = f[i].ID
+	}
+	return uu.RemoveFseventIDs(ids...)
 }
 
 // ClearEntities clears all "entities" edges to the Entity entity.
@@ -828,6 +865,51 @@ func (uu *UserUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if uu.mutation.FseventsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.FseventsTable,
+			Columns: []string{user.FseventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(fsevent.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uu.mutation.RemovedFseventsIDs(); len(nodes) > 0 && !uu.mutation.FseventsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.FseventsTable,
+			Columns: []string{user.FseventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(fsevent.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uu.mutation.FseventsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.FseventsTable,
+			Columns: []string{user.FseventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(fsevent.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if uu.mutation.EntitiesCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -1154,6 +1236,21 @@ func (uuo *UserUpdateOne) AddTasks(t ...*Task) *UserUpdateOne {
 	return uuo.AddTaskIDs(ids...)
 }
 
+// AddFseventIDs adds the "fsevents" edge to the FsEvent entity by IDs.
+func (uuo *UserUpdateOne) AddFseventIDs(ids ...int) *UserUpdateOne {
+	uuo.mutation.AddFseventIDs(ids...)
+	return uuo
+}
+
+// AddFsevents adds the "fsevents" edges to the FsEvent entity.
+func (uuo *UserUpdateOne) AddFsevents(f ...*FsEvent) *UserUpdateOne {
+	ids := make([]int, len(f))
+	for i := range f {
+		ids[i] = f[i].ID
+	}
+	return uuo.AddFseventIDs(ids...)
+}
+
 // AddEntityIDs adds the "entities" edge to the Entity entity by IDs.
 func (uuo *UserUpdateOne) AddEntityIDs(ids ...int) *UserUpdateOne {
 	uuo.mutation.AddEntityIDs(ids...)
@@ -1283,6 +1380,27 @@ func (uuo *UserUpdateOne) RemoveTasks(t ...*Task) *UserUpdateOne {
 		ids[i] = t[i].ID
 	}
 	return uuo.RemoveTaskIDs(ids...)
+}
+
+// ClearFsevents clears all "fsevents" edges to the FsEvent entity.
+func (uuo *UserUpdateOne) ClearFsevents() *UserUpdateOne {
+	uuo.mutation.ClearFsevents()
+	return uuo
+}
+
+// RemoveFseventIDs removes the "fsevents" edge to FsEvent entities by IDs.
+func (uuo *UserUpdateOne) RemoveFseventIDs(ids ...int) *UserUpdateOne {
+	uuo.mutation.RemoveFseventIDs(ids...)
+	return uuo
+}
+
+// RemoveFsevents removes "fsevents" edges to FsEvent entities.
+func (uuo *UserUpdateOne) RemoveFsevents(f ...*FsEvent) *UserUpdateOne {
+	ids := make([]int, len(f))
+	for i := range f {
+		ids[i] = f[i].ID
+	}
+	return uuo.RemoveFseventIDs(ids...)
 }
 
 // ClearEntities clears all "entities" edges to the Entity entity.
@@ -1708,6 +1826,51 @@ func (uuo *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(task.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if uuo.mutation.FseventsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.FseventsTable,
+			Columns: []string{user.FseventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(fsevent.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uuo.mutation.RemovedFseventsIDs(); len(nodes) > 0 && !uuo.mutation.FseventsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.FseventsTable,
+			Columns: []string{user.FseventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(fsevent.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := uuo.mutation.FseventsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   user.FseventsTable,
+			Columns: []string{user.FseventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(fsevent.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

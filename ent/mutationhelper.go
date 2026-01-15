@@ -28,6 +28,12 @@ func (m *FileMutation) SetRawID(t int) {
 
 // SetUpdatedAt sets the "updated_at" field.
 
+func (m *FsEventMutation) SetRawID(t int) {
+	m.id = &t
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+
 func (m *GroupMutation) SetRawID(t int) {
 	m.id = &t
 }

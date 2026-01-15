@@ -154,7 +154,7 @@ func (m *manager) ConfirmUploadSession(ctx context.Context, session *fs.UploadSe
 	}
 
 	// Confirm locks on placeholder file
-	if session.LockToken == "" {
+	if session.LockToken != "" {
 		release, ls, err := m.fs.ConfirmLock(ctx, file, file.Uri(false), session.LockToken)
 		if err != nil {
 			return nil, fs.ErrLockExpired.WithError(err)

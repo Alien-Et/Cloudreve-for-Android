@@ -15,6 +15,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/inventory/types"
 	"github.com/cloudreve/Cloudreve/v4/pkg/cache"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/encrypt"
+	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/eventhub"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/fs"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/lock"
 	"github.com/cloudreve/Cloudreve/v4/pkg/hashid"
@@ -44,7 +45,7 @@ type (
 func NewDatabaseFS(u *ent.User, fileClient inventory.FileClient, shareClient inventory.ShareClient,
 	l logging.Logger, ls lock.LockSystem, settingClient setting.Provider,
 	storagePolicyClient inventory.StoragePolicyClient, hasher hashid.Encoder, userClient inventory.UserClient,
-	cache, stateKv cache.Driver, directLinkClient inventory.DirectLinkClient, encryptorFactory encrypt.CryptorFactory) fs.FileSystem {
+	cache, stateKv cache.Driver, directLinkClient inventory.DirectLinkClient, encryptorFactory encrypt.CryptorFactory, eventHub eventhub.EventHub) fs.FileSystem {
 	return &DBFS{
 		user:                u,
 		navigators:          make(map[string]Navigator),
@@ -60,6 +61,7 @@ func NewDatabaseFS(u *ent.User, fileClient inventory.FileClient, shareClient inv
 		stateKv:             stateKv,
 		directLinkClient:    directLinkClient,
 		encryptorFactory:    encryptorFactory,
+		eventHub:            eventHub,
 	}
 }
 
@@ -79,6 +81,7 @@ type DBFS struct {
 	stateKv             cache.Driver
 	mu                  sync.Mutex
 	encryptorFactory    encrypt.CryptorFactory
+	eventHub            eventhub.EventHub
 }
 
 func (f *DBFS) Recycle() {
@@ -643,7 +646,9 @@ func (f *DBFS) createFile(ctx context.Context, parent *File, name string, fileTy
 	}
 
 	file.SetEntities([]*ent.Entity{entity})
-	return newFile(parent, file), nil
+	newFile := newFile(parent, file)
+	f.emitFileCreated(ctx, newFile)
+	return newFile, nil
 }
 
 func (f *DBFS) generateEncryptMetadata(ctx context.Context, uploadRequest *fs.UploadRequest, policy *ent.StoragePolicy) (*types.EncryptMetadata, error) {

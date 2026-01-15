@@ -818,6 +818,29 @@ func HasTasksWith(preds ...predicate.Task) predicate.User {
 	})
 }
 
+// HasFsevents applies the HasEdge predicate on the "fsevents" edge.
+func HasFsevents() predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, FseventsTable, FseventsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasFseventsWith applies the HasEdge predicate on the "fsevents" edge with a given conditions (other predicates).
+func HasFseventsWith(preds ...predicate.FsEvent) predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := newFseventsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasEntities applies the HasEdge predicate on the "entities" edge.
 func HasEntities() predicate.User {
 	return predicate.User(func(s *sql.Selector) {

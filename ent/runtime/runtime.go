@@ -9,6 +9,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/ent/directlink"
 	"github.com/cloudreve/Cloudreve/v4/ent/entity"
 	"github.com/cloudreve/Cloudreve/v4/ent/file"
+	"github.com/cloudreve/Cloudreve/v4/ent/fsevent"
 	"github.com/cloudreve/Cloudreve/v4/ent/group"
 	"github.com/cloudreve/Cloudreve/v4/ent/metadata"
 	"github.com/cloudreve/Cloudreve/v4/ent/node"
@@ -107,6 +108,25 @@ func init() {
 	fileDescIsSymbolic := fileFields[8].Descriptor()
 	// file.DefaultIsSymbolic holds the default value on creation for the is_symbolic field.
 	file.DefaultIsSymbolic = fileDescIsSymbolic.Default.(bool)
+	fseventMixin := schema.FsEvent{}.Mixin()
+	fseventMixinHooks0 := fseventMixin[0].Hooks()
+	fsevent.Hooks[0] = fseventMixinHooks0[0]
+	fseventMixinInters0 := fseventMixin[0].Interceptors()
+	fsevent.Interceptors[0] = fseventMixinInters0[0]
+	fseventMixinFields0 := fseventMixin[0].Fields()
+	_ = fseventMixinFields0
+	fseventFields := schema.FsEvent{}.Fields()
+	_ = fseventFields
+	// fseventDescCreatedAt is the schema descriptor for created_at field.
+	fseventDescCreatedAt := fseventMixinFields0[0].Descriptor()
+	// fsevent.DefaultCreatedAt holds the default value on creation for the created_at field.
+	fsevent.DefaultCreatedAt = fseventDescCreatedAt.Default.(func() time.Time)
+	// fseventDescUpdatedAt is the schema descriptor for updated_at field.
+	fseventDescUpdatedAt := fseventMixinFields0[1].Descriptor()
+	// fsevent.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	fsevent.DefaultUpdatedAt = fseventDescUpdatedAt.Default.(func() time.Time)
+	// fsevent.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	fsevent.UpdateDefaultUpdatedAt = fseventDescUpdatedAt.UpdateDefault.(func() time.Time)
 	groupMixin := schema.Group{}.Mixin()
 	groupMixinHooks0 := groupMixin[0].Hooks()
 	group.Hooks[0] = groupMixinHooks0[0]

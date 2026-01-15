@@ -67,7 +67,7 @@ func NewRawEntClient(l logging.Logger, config conf.ConfigProvider) (*ent.Client,
 	}
 	// If Database connection string provided, use it directly.
 	if dbConfig.DatabaseURL != "" {
-		l.Info("Connect to database with connection string %q.", dbConfig.DatabaseURL)
+		l.Info("Connect to database with connection string")
 		client, err = sql.Open(string(confDBType), dbConfig.DatabaseURL)
 	} else {
 

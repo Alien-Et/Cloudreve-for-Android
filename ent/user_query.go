@@ -14,6 +14,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/ent/davaccount"
 	"github.com/cloudreve/Cloudreve/v4/ent/entity"
 	"github.com/cloudreve/Cloudreve/v4/ent/file"
+	"github.com/cloudreve/Cloudreve/v4/ent/fsevent"
 	"github.com/cloudreve/Cloudreve/v4/ent/group"
 	"github.com/cloudreve/Cloudreve/v4/ent/passkey"
 	"github.com/cloudreve/Cloudreve/v4/ent/predicate"
@@ -35,6 +36,7 @@ type UserQuery struct {
 	withShares      *ShareQuery
 	withPasskey     *PasskeyQuery
 	withTasks       *TaskQuery
+	withFsevents    *FsEventQuery
 	withEntities    *EntityQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
@@ -197,6 +199,28 @@ func (uq *UserQuery) QueryTasks() *TaskQuery {
 			sqlgraph.From(user.Table, user.FieldID, selector),
 			sqlgraph.To(task.Table, task.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, user.TasksTable, user.TasksColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(uq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryFsevents chains the current query on the "fsevents" edge.
+func (uq *UserQuery) QueryFsevents() *FsEventQuery {
+	query := (&FsEventClient{config: uq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := uq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := uq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(fsevent.Table, fsevent.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.FseventsTable, user.FseventsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(uq.driver.Dialect(), step)
 		return fromU, nil
@@ -424,6 +448,7 @@ func (uq *UserQuery) Clone() *UserQuery {
 		withShares:      uq.withShares.Clone(),
 		withPasskey:     uq.withPasskey.Clone(),
 		withTasks:       uq.withTasks.Clone(),
+		withFsevents:    uq.withFsevents.Clone(),
 		withEntities:    uq.withEntities.Clone(),
 		// clone intermediate query.
 		sql:  uq.sql.Clone(),
@@ -494,6 +519,17 @@ func (uq *UserQuery) WithTasks(opts ...func(*TaskQuery)) *UserQuery {
 		opt(query)
 	}
 	uq.withTasks = query
+	return uq
+}
+
+// WithFsevents tells the query-builder to eager-load the nodes that are connected to
+// the "fsevents" edge. The optional arguments are used to configure the query builder of the edge.
+func (uq *UserQuery) WithFsevents(opts ...func(*FsEventQuery)) *UserQuery {
+	query := (&FsEventClient{config: uq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	uq.withFsevents = query
 	return uq
 }
 
@@ -586,13 +622,14 @@ func (uq *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 	var (
 		nodes       = []*User{}
 		_spec       = uq.querySpec()
-		loadedTypes = [7]bool{
+		loadedTypes = [8]bool{
 			uq.withGroup != nil,
 			uq.withFiles != nil,
 			uq.withDavAccounts != nil,
 			uq.withShares != nil,
 			uq.withPasskey != nil,
 			uq.withTasks != nil,
+			uq.withFsevents != nil,
 			uq.withEntities != nil,
 		}
 	)
@@ -652,6 +689,13 @@ func (uq *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		if err := uq.loadTasks(ctx, query, nodes,
 			func(n *User) { n.Edges.Tasks = []*Task{} },
 			func(n *User, e *Task) { n.Edges.Tasks = append(n.Edges.Tasks, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := uq.withFsevents; query != nil {
+		if err := uq.loadFsevents(ctx, query, nodes,
+			func(n *User) { n.Edges.Fsevents = []*FsEvent{} },
+			func(n *User, e *FsEvent) { n.Edges.Fsevents = append(n.Edges.Fsevents, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -840,6 +884,36 @@ func (uq *UserQuery) loadTasks(ctx context.Context, query *TaskQuery, nodes []*U
 		node, ok := nodeids[fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "user_tasks" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (uq *UserQuery) loadFsevents(ctx context.Context, query *FsEventQuery, nodes []*User, init func(*User), assign func(*User, *FsEvent)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(fsevent.FieldUserFsevent)
+	}
+	query.Where(predicate.FsEvent(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.FseventsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.UserFsevent
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "user_fsevent" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}

@@ -48,6 +48,7 @@ type System struct {
 	GracePeriod   int    `validate:"gte=0"`
 	ProxyHeader   string
 	LogLevel      string `validate:"oneof=debug info warning error"`
+	Pprof         string // Address to listen for pprof, e.g. "localhost:6060". Empty to disable.
 }
 
 type SSL struct {

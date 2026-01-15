@@ -2,8 +2,11 @@ package util
 
 import (
 	"context"
+	cryptoRand "crypto/rand"
 	"fmt"
+	"math/big"
 	"math/rand"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -29,6 +32,20 @@ func RandStringRunes(n int) string {
 	b := make([]rune, n)
 	for i := range b {
 		b[i] = RandomVariantAll[rand.Intn(len(RandomVariantAll))]
+	}
+	return string(b)
+}
+
+func RandStringRunesCrypto(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		num, err := cryptoRand.Int(cryptoRand.Reader, big.NewInt(int64(len(RandomVariantAll))))
+		if err != nil {
+			// fallback to math/rand on crypto failure
+			b[i] = RandomVariantAll[rand.Intn(len(RandomVariantAll))]
+		} else {
+			b[i] = RandomVariantAll[num.Int64()]
+		}
 	}
 	return string(b)
 }
@@ -101,7 +118,7 @@ func Replace(table map[string]string, s string) string {
 
 // ReplaceMagicVar 动态替换字符串中的魔法变量
 func ReplaceMagicVar(rawString string, fsSeparator string, pathAvailable bool, blobAvailable bool,
-					 timeConst time.Time, userId int, originName string, originPath string, completeBlobPath string) string {
+	timeConst time.Time, userId int, originName string, originPath string, completeBlobPath string) string {
 	re := regexp.MustCompile(`\{[^{}]+\}`)
 	return re.ReplaceAllStringFunc(rawString, func(match string) string {
 		switch match {
@@ -164,7 +181,7 @@ func ReplaceMagicVar(rawString string, fsSeparator string, pathAvailable bool, b
 			return match
 		case "{blob_path}":
 			if blobAvailable {
-				return filepath.Dir(completeBlobPath) + fsSeparator
+				return path.Dir(completeBlobPath) + fsSeparator
 			}
 			return match
 		default:

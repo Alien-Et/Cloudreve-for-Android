@@ -51,6 +51,7 @@ func (User) Edges() []ent.Edge {
 		edge.To("shares", Share.Type),
 		edge.To("passkey", Passkey.Type),
 		edge.To("tasks", Task.Type),
+		edge.To("fsevents", FsEvent.Type),
 		edge.To("entities", Entity.Type),
 	}
 }

@@ -103,6 +103,7 @@ func InitializeHandling(dep dependency.Dep) gin.HandlerFunc {
 			IP:        clientIp,
 			Host:      c.Request.Host,
 			UserAgent: c.Request.UserAgent(),
+			ClientID:  c.GetHeader(request.ClientIDHeader),
 		}
 		cid := uuid.FromStringOrNil(c.GetHeader(request.CorrelationHeader))
 		if cid == uuid.Nil {

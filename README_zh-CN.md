@@ -12,14 +12,14 @@
 
 <p align="center">
   <a href="https://dev.azure.com/abslantliu/Cloudreve/_build?definitionId=6">
-    <img src="https://dev.azure.com/abslantliu/Cloudreve/_apis/build/status%2Fcloudreve.Cloudreve?branchName=refs%2Fpull%2F2481%2Fmerge"
+    <img src="https://img.shields.io/github/check-runs/cloudreve/cloudreve/master"
          alt="Azure pipelines">
   </a>
   <a href="https://github.com/cloudreve/Cloudreve/releases">
     <img src="https://img.shields.io/github/v/release/cloudreve/Cloudreve?include_prereleases" />
   </a>
-  <a href="https://hub.docker.com/r/cloudreve/cloudreve">
-     <img src="https://img.shields.io/docker/image-size/cloudreve/cloudreve"/>
+  <a href="https://github.com/cloudreve/Cloudreve/releases">
+     <img src="https://badgen.net/static/release%20size/34%20MB/blue"/>
   </a>
   <a href="https://hub.docker.com/r/cloudreve/cloudreve">
   <img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/cloudreve/cloudreve" />

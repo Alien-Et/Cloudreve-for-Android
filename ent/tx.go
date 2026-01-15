@@ -22,6 +22,8 @@ type Tx struct {
 	Entity *EntityClient
 	// File is the client for interacting with the File builders.
 	File *FileClient
+	// FsEvent is the client for interacting with the FsEvent builders.
+	FsEvent *FsEventClient
 	// Group is the client for interacting with the Group builders.
 	Group *GroupClient
 	// Metadata is the client for interacting with the Metadata builders.
@@ -175,6 +177,7 @@ func (tx *Tx) init() {
 	tx.DirectLink = NewDirectLinkClient(tx.config)
 	tx.Entity = NewEntityClient(tx.config)
 	tx.File = NewFileClient(tx.config)
+	tx.FsEvent = NewFsEventClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)
 	tx.Metadata = NewMetadataClient(tx.config)
 	tx.Node = NewNodeClient(tx.config)

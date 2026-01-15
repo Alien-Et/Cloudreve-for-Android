@@ -64,11 +64,13 @@ type UserEdges struct {
 	Passkey []*Passkey `json:"passkey,omitempty"`
 	// Tasks holds the value of the tasks edge.
 	Tasks []*Task `json:"tasks,omitempty"`
+	// Fsevents holds the value of the fsevents edge.
+	Fsevents []*FsEvent `json:"fsevents,omitempty"`
 	// Entities holds the value of the entities edge.
 	Entities []*Entity `json:"entities,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [7]bool
+	loadedTypes [8]bool
 }
 
 // GroupOrErr returns the Group value or an error if the edge
@@ -129,10 +131,19 @@ func (e UserEdges) TasksOrErr() ([]*Task, error) {
 	return nil, &NotLoadedError{edge: "tasks"}
 }
 
+// FseventsOrErr returns the Fsevents value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) FseventsOrErr() ([]*FsEvent, error) {
+	if e.loadedTypes[6] {
+		return e.Fsevents, nil
+	}
+	return nil, &NotLoadedError{edge: "fsevents"}
+}
+
 // EntitiesOrErr returns the Entities value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) EntitiesOrErr() ([]*Entity, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[7] {
 		return e.Entities, nil
 	}
 	return nil, &NotLoadedError{edge: "entities"}
@@ -290,6 +301,11 @@ func (u *User) QueryTasks() *TaskQuery {
 	return NewUserClient(u.config).QueryTasks(u)
 }
 
+// QueryFsevents queries the "fsevents" edge of the User entity.
+func (u *User) QueryFsevents() *FsEventQuery {
+	return NewUserClient(u.config).QueryFsevents(u)
+}
+
 // QueryEntities queries the "entities" edge of the User entity.
 func (u *User) QueryEntities() *EntityQuery {
 	return NewUserClient(u.config).QueryEntities(u)
@@ -393,10 +409,16 @@ func (e *User) SetTasks(v []*Task) {
 	e.Edges.loadedTypes[5] = true
 }
 
+// SetFsevents manually set the edge as loaded state.
+func (e *User) SetFsevents(v []*FsEvent) {
+	e.Edges.Fsevents = v
+	e.Edges.loadedTypes[6] = true
+}
+
 // SetEntities manually set the edge as loaded state.
 func (e *User) SetEntities(v []*Entity) {
 	e.Edges.Entities = v
-	e.Edges.loadedTypes[6] = true
+	e.Edges.loadedTypes[7] = true
 }
 
 // Users is a parsable slice of User.

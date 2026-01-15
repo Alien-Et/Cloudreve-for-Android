@@ -18,6 +18,9 @@ type Entity func(*sql.Selector)
 // File is the predicate function for file builders.
 type File func(*sql.Selector)
 
+// FsEvent is the predicate function for fsevent builders.
+type FsEvent func(*sql.Selector)
+
 // Group is the predicate function for group builders.
 type Group func(*sql.Selector)
 

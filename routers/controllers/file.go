@@ -426,3 +426,13 @@ func ListArchiveFiles(c *gin.Context) {
 		Data: resp,
 	})
 }
+
+func HandleExplorerEventsPush(c *gin.Context) {
+	service := ParametersFromContext[*explorer.ExplorerEventService](c, explorer.ExplorerEventParamCtx{})
+	err := service.HandleExplorerEventsPush(c)
+	if err != nil {
+		c.JSON(200, serializer.Err(c, err))
+		c.Abort()
+		return
+	}
+}

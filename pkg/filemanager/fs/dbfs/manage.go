@@ -119,6 +119,7 @@ func (f *DBFS) Create(ctx context.Context, path *fs.URI, fileType types.FileType
 			}
 
 			ancestor = newFile(ancestor, newFolder)
+			f.emitFileCreated(ctx, ancestor)
 		} else {
 			// valide file name
 			policy, err := f.getPreferredPolicy(ctx, ancestor)
@@ -225,6 +226,8 @@ func (f *DBFS) Rename(ctx context.Context, path *fs.URI, newName string) (fs.Fil
 		return nil, serializer.NewError(serializer.CodeDBError, "Failed to commit rename change", err)
 	}
 
+	f.emitFileRenamed(ctx, target, newName)
+
 	return target.Replace(updated), nil
 }
 
@@ -302,6 +305,8 @@ func (f *DBFS) SoftDelete(ctx context.Context, path ...*fs.URI) error {
 	if err := inventory.Commit(tx); err != nil {
 		return serializer.NewError(serializer.CodeDBError, "Failed to commit soft-delete change", err)
 	}
+
+	f.emitFileDeleted(ctx, targets...)
 
 	return ae.Aggregate()
 }
@@ -385,7 +390,7 @@ func (f *DBFS) Delete(ctx context.Context, path []*fs.URI, opts ...fs.Option) ([
 	if err := inventory.CommitWithStorageDiff(ctx, tx, f.l, f.userClient); err != nil {
 		return nil, serializer.NewError(serializer.CodeDBError, "Failed to commit delete change", err)
 	}
-
+	f.emitFileDeleted(ctx, targets...)
 	return newStaleEntities, ae.Aggregate()
 }
 
@@ -603,10 +608,11 @@ func (f *DBFS) MoveOrCopy(ctx context.Context, path []*fs.URI, dst *fs.URI, isCo
 		}
 
 		var (
-			storageDiff inventory.StorageDiff
+			copiedNewTargetsMap map[int]*ent.File
+			storageDiff         inventory.StorageDiff
 		)
 		if isCopy {
-			_, storageDiff, err = f.copyFiles(ctx, fileNavGroup, destination, fc)
+			copiedNewTargetsMap, storageDiff, err = f.copyFiles(ctx, fileNavGroup, destination, fc)
 		} else {
 			storageDiff, err = f.moveFiles(ctx, targets, destination, fc, dstNavigator)
 		}
@@ -619,6 +625,14 @@ func (f *DBFS) MoveOrCopy(ctx context.Context, path []*fs.URI, dst *fs.URI, isCo
 		tx.AppendStorageDiff(storageDiff)
 		if err := inventory.CommitWithStorageDiff(ctx, tx, f.l, f.userClient); err != nil {
 			return serializer.NewError(serializer.CodeDBError, "Failed to commit move change", err)
+		}
+
+		for _, target := range targets {
+			if isCopy {
+				f.emitFileCreated(ctx, newFile(destination, copiedNewTargetsMap[target.ID()]))
+			} else {
+				f.emitFileMoved(ctx, target, destination)
+			}
 		}
 
 		// TODO: after move, dbfs cache should be cleared
@@ -716,6 +730,8 @@ func (f *DBFS) deleteEntity(ctx context.Context, target *File, entityId int) (in
 			return nil, serializer.NewError(serializer.CodeDBError, "Failed to remove upload session metadata", err)
 		}
 	}
+
+	f.emitFileModified(ctx, target)
 	return diff, nil
 }
 
@@ -736,7 +752,7 @@ func (f *DBFS) setCurrentVersion(ctx context.Context, target *File, versionId in
 		return serializer.NewError(serializer.CodeDBError, "Failed to start transaction", err)
 	}
 
-	if err := fc.SetPrimaryEntity(ctx, target.Model, targetVersion.ID()); err != nil {
+	if err := fc.SetPrimaryEntity(ctx, target.Model, targetVersion.Model()); err != nil {
 		_ = inventory.Rollback(tx)
 		return serializer.NewError(serializer.CodeDBError, "Failed to set primary entity", err)
 	}
@@ -753,6 +769,7 @@ func (f *DBFS) setCurrentVersion(ctx context.Context, target *File, versionId in
 		return serializer.NewError(serializer.CodeDBError, "Failed to commit set current version", err)
 	}
 
+	f.emitFileModified(ctx, target)
 	return nil
 }
 
