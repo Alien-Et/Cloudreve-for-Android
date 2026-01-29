@@ -31,9 +31,7 @@ type Subscriber interface {
 }
 
 const (
-	debounceDelay = 5 * time.Second
-	userCacheTTL  = 1 * time.Hour
-	offlineMaxAge = 14 * 24 * time.Hour // 14 days
+	userCacheTTL = 1 * time.Hour
 )
 
 type subscriber struct {
@@ -50,8 +48,10 @@ type subscriber struct {
 	offlineSince time.Time
 
 	// Debounce buffer for pending events
-	buffer []*Event
-	timer  *time.Timer
+	buffer        []*Event
+	timer         *time.Timer
+	offlineMaxAge time.Duration
+	debounceDelay time.Duration
 
 	// Owner info
 	ownerCached *ent.User
@@ -62,7 +62,7 @@ type subscriber struct {
 	closedCh chan struct{}
 }
 
-func newSubscriber(ctx context.Context, id string, userClient inventory.UserClient, fsEventClient inventory.FsEventClient) (*subscriber, error) {
+func newSubscriber(ctx context.Context, id string, userClient inventory.UserClient, fsEventClient inventory.FsEventClient, maxAge, debounceDelay time.Duration) (*subscriber, error) {
 	user := inventory.UserFromContext(ctx)
 	if user == nil || inventory.IsAnonymousUser(user) {
 		return nil, errors.New("user not found")
@@ -73,11 +73,14 @@ func newSubscriber(ctx context.Context, id string, userClient inventory.UserClie
 		ch:            make(chan *Event, bufSize),
 		userClient:    userClient,
 		fsEventClient: fsEventClient,
+
 		ownerCached:   user,
 		uid:           user.ID,
 		cachedAt:      time.Now(),
 		online:        true,
 		closedCh:      make(chan struct{}),
+		offlineMaxAge: maxAge,
+		debounceDelay: debounceDelay,
 	}, nil
 }
 
@@ -105,6 +108,10 @@ func (s *subscriber) Owner() (*ent.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.ownerLocked()
+}
+
+func (s *subscriber) ownerLocked() (*ent.User, error) {
 	if time.Since(s.cachedAt) > userCacheTTL || s.ownerCached == nil {
 		user, err := s.userClient.GetLoginUserByID(context.Background(), s.uid)
 		if err != nil {
@@ -142,7 +149,7 @@ func (s *subscriber) publishLocked(evt Event) {
 	if s.timer != nil {
 		s.timer.Stop()
 	}
-	s.timer = time.AfterFunc(debounceDelay, s.flush)
+	s.timer = time.AfterFunc(s.debounceDelay, s.flush)
 }
 
 // flush sends all buffered events to the channel.
@@ -162,7 +169,11 @@ func (s *subscriber) flushLocked(ctx context.Context) {
 	}
 
 	if !s.online {
-		_ = s.fsEventClient.Create(ctx, s.ownerCached.ID, uuid.FromStringOrNil(s.id), lo.Map(s.buffer, func(item *Event, index int) string {
+		owner, err := s.ownerLocked()
+		if err != nil {
+			return
+		}
+		_ = s.fsEventClient.Create(ctx, owner.ID, uuid.FromStringOrNil(s.id), lo.Map(s.buffer, func(item *Event, index int) string {
 			res, _ := json.Marshal(item)
 			return string(res)
 		})...)
@@ -236,7 +247,7 @@ func (s *subscriber) setOnline(ctx context.Context) {
 		if s.timer != nil {
 			s.timer.Stop()
 		}
-		s.timer = time.AfterFunc(debounceDelay, s.flush)
+		s.timer = time.AfterFunc(s.debounceDelay, s.flush)
 	}
 }
 
@@ -297,7 +308,7 @@ func (s *subscriber) isClosed() bool {
 func (s *subscriber) shouldExpire() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return !s.online && !s.offlineSince.IsZero() && time.Since(s.offlineSince) > offlineMaxAge
+	return !s.online && !s.offlineSince.IsZero() && time.Since(s.offlineSince) > s.offlineMaxAge
 }
 
 // Buffer returns a copy of the current buffered events.

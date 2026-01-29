@@ -668,6 +668,10 @@ var DefaultSettings = map[string]string{
 	"encrypt_master_key_vault":                   "setting",
 	"encrypt_master_key_file":                    "",
 	"show_encryption_status":                     "1",
+	"show_desktop_app_promotion":                 "1",
+	"fs_event_push_enabled":                      "1",
+	"fs_event_push_max_age":                      "1209600",
+	"fs_event_push_debounce":                     "5",
 }
 
 var RedactedSettings = map[string]struct{}{

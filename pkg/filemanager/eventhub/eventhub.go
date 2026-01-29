@@ -7,6 +7,7 @@ import (
 
 	"github.com/cloudreve/Cloudreve/v4/inventory"
 	"github.com/cloudreve/Cloudreve/v4/pkg/logging"
+	"github.com/cloudreve/Cloudreve/v4/pkg/setting"
 )
 
 type (
@@ -36,16 +37,18 @@ type eventHub struct {
 	topics        map[int]map[string]*subscriber
 	userClient    inventory.UserClient
 	fsEventClient inventory.FsEventClient
+	settings      setting.Provider
 	closed        bool
 	closeCh       chan struct{}
 	wg            sync.WaitGroup
 }
 
-func NewEventHub(userClient inventory.UserClient, fsEventClient inventory.FsEventClient) EventHub {
+func NewEventHub(userClient inventory.UserClient, fsEventClient inventory.FsEventClient, settings setting.Provider) EventHub {
 	e := &eventHub{
 		topics:        make(map[int]map[string]*subscriber),
 		userClient:    userClient,
 		fsEventClient: fsEventClient,
+		settings:      settings,
 		closeCh:       make(chan struct{}),
 	}
 
@@ -139,7 +142,7 @@ func (e *eventHub) Subscribe(ctx context.Context, topic int, id string) (chan *E
 		}
 	}
 
-	sub, err := newSubscriber(ctx, id, e.userClient, e.fsEventClient)
+	sub, err := newSubscriber(ctx, id, e.userClient, e.fsEventClient, e.settings.EventHubMaxOfflineDuration(ctx), e.settings.EventHubDebounceDelay(ctx))
 	if err != nil {
 		return nil, false, err
 	}

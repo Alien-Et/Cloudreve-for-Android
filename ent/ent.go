@@ -20,6 +20,8 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/ent/group"
 	"github.com/cloudreve/Cloudreve/v4/ent/metadata"
 	"github.com/cloudreve/Cloudreve/v4/ent/node"
+	"github.com/cloudreve/Cloudreve/v4/ent/oauthclient"
+	"github.com/cloudreve/Cloudreve/v4/ent/oauthgrant"
 	"github.com/cloudreve/Cloudreve/v4/ent/passkey"
 	"github.com/cloudreve/Cloudreve/v4/ent/setting"
 	"github.com/cloudreve/Cloudreve/v4/ent/share"
@@ -94,6 +96,8 @@ func checkColumn(table, column string) error {
 			group.Table:         group.ValidColumn,
 			metadata.Table:      metadata.ValidColumn,
 			node.Table:          node.ValidColumn,
+			oauthclient.Table:   oauthclient.ValidColumn,
+			oauthgrant.Table:    oauthgrant.ValidColumn,
 			passkey.Table:       passkey.ValidColumn,
 			setting.Table:       setting.ValidColumn,
 			share.Table:         share.ValidColumn,

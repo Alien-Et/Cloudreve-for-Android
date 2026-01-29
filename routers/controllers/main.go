@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/cloudreve/Cloudreve/v4/pkg/serializer"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -76,6 +77,19 @@ func FromQuery[T any](ctxKey any) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var service T
 		if err := c.ShouldBindQuery(&service); err == nil {
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxKey, &service))
+			c.Next()
+		} else {
+			c.JSON(200, ErrorResponse(err))
+			c.Abort()
+		}
+	}
+}
+
+func FromForm[T any](ctxKey any) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var service T
+		if err := c.ShouldBind(&service); err == nil {
 			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxKey, &service))
 			c.Next()
 		} else {

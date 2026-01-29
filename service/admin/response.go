@@ -114,6 +114,17 @@ type ListGroupResponse struct {
 	Pagination *inventory.PaginationResults `json:"pagination"`
 }
 
+type ListOAuthClientResponse struct {
+	Clients    []GetOAuthClientResponse     `json:"clients"`
+	Pagination *inventory.PaginationResults `json:"pagination"`
+}
+
+type GetOAuthClientResponse struct {
+	*ent.OAuthClient
+	IsSystem    bool `json:"is_system"`
+	TotalGrants int  `json:"total_grants,omitempty"`
+}
+
 type HomepageSummary struct {
 	MetricsSummary *MetricsSummary `json:"metrics_summary"`
 	SiteURls       []string        `json:"site_urls"`

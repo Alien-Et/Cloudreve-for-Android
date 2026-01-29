@@ -61,6 +61,11 @@ func MasterUserResetUrl(base *url.URL) *url.URL {
 	return base.ResolveReference(masterUserReset)
 }
 
+func MasterUserAvatarUrl(base *url.URL, uid string) *url.URL {
+	route, _ := url.Parse(constants.APIPrefix + "/user/avatar/" + uid)
+	return base.ResolveReference(route)
+}
+
 func MasterShareUrl(base *url.URL, id, password string) *url.URL {
 	p := "/s/" + id
 	if password != "" {

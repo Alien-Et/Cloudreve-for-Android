@@ -192,7 +192,8 @@ const (
 )
 
 type AppSetting struct {
-	Promotion bool
+	Promotion        bool
+	DesktopPromotion bool
 }
 
 type EmailTemplate struct {

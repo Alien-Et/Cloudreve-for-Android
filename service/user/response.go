@@ -22,17 +22,18 @@ type PreparePasskeyLoginResponse struct {
 }
 
 type UserSettings struct {
-	VersionRetentionEnabled bool      `json:"version_retention_enabled"`
-	VersionRetentionExt     []string  `json:"version_retention_ext,omitempty"`
-	VersionRetentionMax     int       `json:"version_retention_max,omitempty"`
-	Paswordless             bool      `json:"passwordless"`
-	TwoFAEnabled            bool      `json:"two_fa_enabled"`
-	Passkeys                []Passkey `json:"passkeys,omitempty"`
-	DisableViewSync         bool      `json:"disable_view_sync"`
-	ShareLinksInProfile     string    `json:"share_links_in_profile"`
+	VersionRetentionEnabled bool         `json:"version_retention_enabled"`
+	VersionRetentionExt     []string     `json:"version_retention_ext,omitempty"`
+	VersionRetentionMax     int          `json:"version_retention_max,omitempty"`
+	Paswordless             bool         `json:"passwordless"`
+	TwoFAEnabled            bool         `json:"two_fa_enabled"`
+	Passkeys                []Passkey    `json:"passkeys,omitempty"`
+	DisableViewSync         bool         `json:"disable_view_sync"`
+	ShareLinksInProfile     string       `json:"share_links_in_profile"`
+	OAuthGrants             []OauthGrant `json:"oauth_grants,omitempty"`
 }
 
-func BuildUserSettings(u *ent.User, passkeys []*ent.Passkey, parser *uaparser.Parser) *UserSettings {
+func BuildUserSettings(u *ent.User, passkeys []*ent.Passkey, parser *uaparser.Parser, grants []*ent.OAuthGrant) *UserSettings {
 	return &UserSettings{
 		VersionRetentionEnabled: u.Settings.VersionRetention,
 		VersionRetentionExt:     u.Settings.VersionRetentionExt,
@@ -44,6 +45,9 @@ func BuildUserSettings(u *ent.User, passkeys []*ent.Passkey, parser *uaparser.Pa
 		}),
 		DisableViewSync:     u.Settings.DisableViewSync,
 		ShareLinksInProfile: string(u.Settings.ShareLinksInProfile),
+		OAuthGrants: lo.Map(grants, func(item *ent.OAuthGrant, index int) OauthGrant {
+			return BuildOauthGrant(item)
+		}),
 	}
 }
 
@@ -170,6 +174,31 @@ func BuildUser(user *ent.User, idEncoder hashid.Encoder) User {
 		DisableViewSync:     user.Settings.DisableViewSync,
 		ShareLinksInProfile: user.Settings.ShareLinksInProfile,
 	}
+}
+
+type OauthGrant struct {
+	ClientID   string     `json:"client_id"`
+	ClientName string     `json:"client_name"`
+	ClientLogo string     `json:"client_logo"`
+	Scopes     []string   `json:"scopes"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+}
+
+func BuildOauthGrant(grant *ent.OAuthGrant) OauthGrant {
+	res := OauthGrant{
+		Scopes:     grant.Scopes,
+		LastUsedAt: grant.LastUsedAt,
+	}
+
+	if grant.Edges.Client != nil {
+		res.ClientID = grant.Edges.Client.GUID
+		res.ClientName = grant.Edges.Client.Name
+		if grant.Edges.Client.Props != nil {
+			res.ClientLogo = grant.Edges.Client.Props.Icon
+		}
+	}
+
+	return res
 }
 
 func BuildGroup(group *ent.Group, idEncoder hashid.Encoder) *Group {

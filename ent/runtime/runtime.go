@@ -13,6 +13,8 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/ent/group"
 	"github.com/cloudreve/Cloudreve/v4/ent/metadata"
 	"github.com/cloudreve/Cloudreve/v4/ent/node"
+	"github.com/cloudreve/Cloudreve/v4/ent/oauthclient"
+	"github.com/cloudreve/Cloudreve/v4/ent/oauthgrant"
 	"github.com/cloudreve/Cloudreve/v4/ent/passkey"
 	"github.com/cloudreve/Cloudreve/v4/ent/schema"
 	"github.com/cloudreve/Cloudreve/v4/ent/setting"
@@ -200,6 +202,80 @@ func init() {
 	nodeDescWeight := nodeFields[7].Descriptor()
 	// node.DefaultWeight holds the default value on creation for the weight field.
 	node.DefaultWeight = nodeDescWeight.Default.(int)
+	oauthclientMixin := schema.OAuthClient{}.Mixin()
+	oauthclientMixinHooks0 := oauthclientMixin[0].Hooks()
+	oauthclient.Hooks[0] = oauthclientMixinHooks0[0]
+	oauthclientMixinInters0 := oauthclientMixin[0].Interceptors()
+	oauthclient.Interceptors[0] = oauthclientMixinInters0[0]
+	oauthclientMixinFields0 := oauthclientMixin[0].Fields()
+	_ = oauthclientMixinFields0
+	oauthclientFields := schema.OAuthClient{}.Fields()
+	_ = oauthclientFields
+	// oauthclientDescCreatedAt is the schema descriptor for created_at field.
+	oauthclientDescCreatedAt := oauthclientMixinFields0[0].Descriptor()
+	// oauthclient.DefaultCreatedAt holds the default value on creation for the created_at field.
+	oauthclient.DefaultCreatedAt = oauthclientDescCreatedAt.Default.(func() time.Time)
+	// oauthclientDescUpdatedAt is the schema descriptor for updated_at field.
+	oauthclientDescUpdatedAt := oauthclientMixinFields0[1].Descriptor()
+	// oauthclient.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	oauthclient.DefaultUpdatedAt = oauthclientDescUpdatedAt.Default.(func() time.Time)
+	// oauthclient.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	oauthclient.UpdateDefaultUpdatedAt = oauthclientDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// oauthclientDescGUID is the schema descriptor for guid field.
+	oauthclientDescGUID := oauthclientFields[0].Descriptor()
+	// oauthclient.GUIDValidator is a validator for the "guid" field. It is called by the builders before save.
+	oauthclient.GUIDValidator = oauthclientDescGUID.Validators[0].(func(string) error)
+	// oauthclientDescSecret is the schema descriptor for secret field.
+	oauthclientDescSecret := oauthclientFields[1].Descriptor()
+	// oauthclient.SecretValidator is a validator for the "secret" field. It is called by the builders before save.
+	oauthclient.SecretValidator = oauthclientDescSecret.Validators[0].(func(string) error)
+	// oauthclientDescName is the schema descriptor for name field.
+	oauthclientDescName := oauthclientFields[2].Descriptor()
+	// oauthclient.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	oauthclient.NameValidator = oauthclientDescName.Validators[0].(func(string) error)
+	// oauthclientDescHomepageURL is the schema descriptor for homepage_url field.
+	oauthclientDescHomepageURL := oauthclientFields[3].Descriptor()
+	// oauthclient.HomepageURLValidator is a validator for the "homepage_url" field. It is called by the builders before save.
+	oauthclient.HomepageURLValidator = oauthclientDescHomepageURL.Validators[0].(func(string) error)
+	// oauthclientDescRedirectUris is the schema descriptor for redirect_uris field.
+	oauthclientDescRedirectUris := oauthclientFields[4].Descriptor()
+	// oauthclient.DefaultRedirectUris holds the default value on creation for the redirect_uris field.
+	oauthclient.DefaultRedirectUris = oauthclientDescRedirectUris.Default.([]string)
+	// oauthclientDescScopes is the schema descriptor for scopes field.
+	oauthclientDescScopes := oauthclientFields[5].Descriptor()
+	// oauthclient.DefaultScopes holds the default value on creation for the scopes field.
+	oauthclient.DefaultScopes = oauthclientDescScopes.Default.([]string)
+	// oauthclientDescProps is the schema descriptor for props field.
+	oauthclientDescProps := oauthclientFields[6].Descriptor()
+	// oauthclient.DefaultProps holds the default value on creation for the props field.
+	oauthclient.DefaultProps = oauthclientDescProps.Default.(*types.OAuthClientProps)
+	// oauthclientDescIsEnabled is the schema descriptor for is_enabled field.
+	oauthclientDescIsEnabled := oauthclientFields[7].Descriptor()
+	// oauthclient.DefaultIsEnabled holds the default value on creation for the is_enabled field.
+	oauthclient.DefaultIsEnabled = oauthclientDescIsEnabled.Default.(bool)
+	oauthgrantMixin := schema.OAuthGrant{}.Mixin()
+	oauthgrantMixinHooks0 := oauthgrantMixin[0].Hooks()
+	oauthgrant.Hooks[0] = oauthgrantMixinHooks0[0]
+	oauthgrantMixinInters0 := oauthgrantMixin[0].Interceptors()
+	oauthgrant.Interceptors[0] = oauthgrantMixinInters0[0]
+	oauthgrantMixinFields0 := oauthgrantMixin[0].Fields()
+	_ = oauthgrantMixinFields0
+	oauthgrantFields := schema.OAuthGrant{}.Fields()
+	_ = oauthgrantFields
+	// oauthgrantDescCreatedAt is the schema descriptor for created_at field.
+	oauthgrantDescCreatedAt := oauthgrantMixinFields0[0].Descriptor()
+	// oauthgrant.DefaultCreatedAt holds the default value on creation for the created_at field.
+	oauthgrant.DefaultCreatedAt = oauthgrantDescCreatedAt.Default.(func() time.Time)
+	// oauthgrantDescUpdatedAt is the schema descriptor for updated_at field.
+	oauthgrantDescUpdatedAt := oauthgrantMixinFields0[1].Descriptor()
+	// oauthgrant.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	oauthgrant.DefaultUpdatedAt = oauthgrantDescUpdatedAt.Default.(func() time.Time)
+	// oauthgrant.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	oauthgrant.UpdateDefaultUpdatedAt = oauthgrantDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// oauthgrantDescScopes is the schema descriptor for scopes field.
+	oauthgrantDescScopes := oauthgrantFields[2].Descriptor()
+	// oauthgrant.DefaultScopes holds the default value on creation for the scopes field.
+	oauthgrant.DefaultScopes = oauthgrantDescScopes.Default.([]string)
 	passkeyMixin := schema.Passkey{}.Mixin()
 	passkeyMixinHooks0 := passkeyMixin[0].Hooks()
 	passkey.Hooks[0] = passkeyMixinHooks0[0]

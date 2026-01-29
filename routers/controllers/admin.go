@@ -597,3 +597,69 @@ func AdminCalibrateStorage(c *gin.Context) {
 	}
 	c.JSON(200, serializer.Response{Data: res})
 }
+
+// AdminListOAuthClients lists OAuth clients
+func AdminListOAuthClients(c *gin.Context) {
+	service := ParametersFromContext[*admin.AdminListService](c, admin.AdminListServiceParamsCtx{})
+	res, err := service.OAuthClients(c)
+	if err != nil {
+		c.JSON(200, serializer.Err(c, err))
+		return
+	}
+	c.JSON(200, serializer.Response{Data: res})
+}
+
+// AdminGetOAuthClient gets an OAuth client by ID
+func AdminGetOAuthClient(c *gin.Context) {
+	service := ParametersFromContext[*admin.SingleOAuthClientService](c, admin.SingleOAuthClientParamCtx{})
+	res, err := service.Get(c)
+	if err != nil {
+		c.JSON(200, serializer.Err(c, err))
+		return
+	}
+	c.JSON(200, serializer.Response{Data: res})
+}
+
+// AdminCreateOAuthClient creates a new OAuth client
+func AdminCreateOAuthClient(c *gin.Context) {
+	service := ParametersFromContext[*admin.UpsertOAuthClientService](c, admin.UpsertOAuthClientParamCtx{})
+	res, err := service.Create(c)
+	if err != nil {
+		c.JSON(200, serializer.Err(c, err))
+		return
+	}
+	c.JSON(200, serializer.Response{Data: res})
+}
+
+// AdminUpdateOAuthClient updates an OAuth client
+func AdminUpdateOAuthClient(c *gin.Context) {
+	service := ParametersFromContext[*admin.UpsertOAuthClientService](c, admin.UpsertOAuthClientParamCtx{})
+	res, err := service.Update(c)
+	if err != nil {
+		c.JSON(200, serializer.Err(c, err))
+		return
+	}
+	c.JSON(200, serializer.Response{Data: res})
+}
+
+// AdminDeleteOAuthClient deletes an OAuth client
+func AdminDeleteOAuthClient(c *gin.Context) {
+	service := ParametersFromContext[*admin.SingleOAuthClientService](c, admin.SingleOAuthClientParamCtx{})
+	err := service.Delete(c)
+	if err != nil {
+		c.JSON(200, serializer.Err(c, err))
+		return
+	}
+	c.JSON(200, serializer.Response{})
+}
+
+// AdminBatchDeleteOAuthClient batch deletes OAuth clients
+func AdminBatchDeleteOAuthClient(c *gin.Context) {
+	service := ParametersFromContext[*admin.BatchOAuthClientService](c, admin.BatchOAuthClientParamCtx{})
+	err := service.Delete(c)
+	if err != nil {
+		c.JSON(200, serializer.Err(c, err))
+		return
+	}
+	c.JSON(200, serializer.Response{})
+}

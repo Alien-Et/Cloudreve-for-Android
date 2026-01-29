@@ -216,6 +216,12 @@ type (
 		MasterEncryptKeyFile(ctx context.Context) string
 		// ShowEncryptionStatus returns true if encryption status is shown.
 		ShowEncryptionStatus(ctx context.Context) bool
+		// EventHubMaxOfflineDuration returns the maximum offline duration of event hub.
+		EventHubMaxOfflineDuration(ctx context.Context) time.Duration
+		// EventHubEnabled returns true if event hub is enabled.
+		EventHubEnabled(ctx context.Context) bool
+		// EventHubDebounceDelay returns the debounce delay of event hub.
+		EventHubDebounceDelay(ctx context.Context) time.Duration
 	}
 	UseFirstSiteUrlCtxKey = struct{}
 )
@@ -319,7 +325,8 @@ func (s *settingProvider) FileViewers(ctx context.Context) []types.ViewerGroup {
 
 func (s *settingProvider) AppSetting(ctx context.Context) *AppSetting {
 	return &AppSetting{
-		Promotion: s.getBoolean(ctx, "show_app_promotion", false),
+		Promotion:        s.getBoolean(ctx, "show_app_promotion", false),
+		DesktopPromotion: s.getBoolean(ctx, "show_desktop_app_promotion", false),
 	}
 }
 
@@ -579,6 +586,18 @@ func (s *settingProvider) EntityUrlCacheMargin(ctx context.Context) int {
 
 func (s *settingProvider) EntityUrlValidDuration(ctx context.Context) time.Duration {
 	return time.Duration(s.getInt(ctx, "entity_url_default_ttl", 3600)) * time.Second
+}
+
+func (s *settingProvider) EventHubMaxOfflineDuration(ctx context.Context) time.Duration {
+	return time.Duration(s.getInt(ctx, "fs_event_push_max_age", 1209600)) * time.Second
+}
+
+func (s *settingProvider) EventHubDebounceDelay(ctx context.Context) time.Duration {
+	return time.Duration(s.getInt(ctx, "fs_event_push_debounce", 5)) * time.Second
+}
+
+func (s *settingProvider) EventHubEnabled(ctx context.Context) bool {
+	return s.getBoolean(ctx, "fs_event_push_enabled", true)
 }
 
 func (s *settingProvider) Queue(ctx context.Context, queueType QueueType) *QueueSetting {

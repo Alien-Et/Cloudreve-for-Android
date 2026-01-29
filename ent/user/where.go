@@ -864,6 +864,29 @@ func HasEntitiesWith(preds ...predicate.Entity) predicate.User {
 	})
 }
 
+// HasOauthGrants applies the HasEdge predicate on the "oauth_grants" edge.
+func HasOauthGrants() predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, OauthGrantsTable, OauthGrantsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasOauthGrantsWith applies the HasEdge predicate on the "oauth_grants" edge with a given conditions (other predicates).
+func HasOauthGrantsWith(preds ...predicate.OAuthGrant) predicate.User {
+	return predicate.User(func(s *sql.Selector) {
+		step := newOauthGrantsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.User) predicate.User {
 	return predicate.User(sql.AndPredicates(predicates...))

@@ -105,6 +105,30 @@ func (f NodeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error)
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.NodeMutation", m)
 }
 
+// The OAuthClientFunc type is an adapter to allow the use of ordinary
+// function as OAuthClient mutator.
+type OAuthClientFunc func(context.Context, *ent.OAuthClientMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f OAuthClientFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.OAuthClientMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.OAuthClientMutation", m)
+}
+
+// The OAuthGrantFunc type is an adapter to allow the use of ordinary
+// function as OAuthGrant mutator.
+type OAuthGrantFunc func(context.Context, *ent.OAuthGrantMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f OAuthGrantFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.OAuthGrantMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.OAuthGrantMutation", m)
+}
+
 // The PasskeyFunc type is an adapter to allow the use of ordinary
 // function as Passkey mutator.
 type PasskeyFunc func(context.Context, *ent.PasskeyMutation) (ent.Value, error)

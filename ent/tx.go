@@ -30,6 +30,10 @@ type Tx struct {
 	Metadata *MetadataClient
 	// Node is the client for interacting with the Node builders.
 	Node *NodeClient
+	// OAuthClient is the client for interacting with the OAuthClient builders.
+	OAuthClient *OAuthClientClient
+	// OAuthGrant is the client for interacting with the OAuthGrant builders.
+	OAuthGrant *OAuthGrantClient
 	// Passkey is the client for interacting with the Passkey builders.
 	Passkey *PasskeyClient
 	// Setting is the client for interacting with the Setting builders.
@@ -181,6 +185,8 @@ func (tx *Tx) init() {
 	tx.Group = NewGroupClient(tx.config)
 	tx.Metadata = NewMetadataClient(tx.config)
 	tx.Node = NewNodeClient(tx.config)
+	tx.OAuthClient = NewOAuthClientClient(tx.config)
+	tx.OAuthGrant = NewOAuthGrantClient(tx.config)
 	tx.Passkey = NewPasskeyClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
 	tx.Share = NewShareClient(tx.config)

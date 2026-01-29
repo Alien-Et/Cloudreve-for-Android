@@ -52,6 +52,18 @@ func (m *NodeMutation) SetRawID(t int) {
 
 // SetUpdatedAt sets the "updated_at" field.
 
+func (m *OAuthClientMutation) SetRawID(t int) {
+	m.id = &t
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+
+func (m *OAuthGrantMutation) SetRawID(t int) {
+	m.id = &t
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+
 func (m *PasskeyMutation) SetRawID(t int) {
 	m.id = &t
 }

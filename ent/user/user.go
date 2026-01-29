@@ -57,6 +57,8 @@ const (
 	EdgeFsevents = "fsevents"
 	// EdgeEntities holds the string denoting the entities edge name in mutations.
 	EdgeEntities = "entities"
+	// EdgeOauthGrants holds the string denoting the oauth_grants edge name in mutations.
+	EdgeOauthGrants = "oauth_grants"
 	// Table holds the table name of the user in the database.
 	Table = "users"
 	// GroupTable is the table that holds the group relation/edge.
@@ -115,6 +117,13 @@ const (
 	EntitiesInverseTable = "entities"
 	// EntitiesColumn is the table column denoting the entities relation/edge.
 	EntitiesColumn = "created_by"
+	// OauthGrantsTable is the table that holds the oauth_grants relation/edge.
+	OauthGrantsTable = "oauth_grants"
+	// OauthGrantsInverseTable is the table name for the OAuthGrant entity.
+	// It exists in this package in order to avoid circular dependency with the "oauthgrant" package.
+	OauthGrantsInverseTable = "oauth_grants"
+	// OauthGrantsColumn is the table column denoting the oauth_grants relation/edge.
+	OauthGrantsColumn = "user_id"
 )
 
 // Columns holds all SQL columns for user fields.
@@ -363,6 +372,20 @@ func ByEntities(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newEntitiesStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByOauthGrantsCount orders the results by oauth_grants count.
+func ByOauthGrantsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newOauthGrantsStep(), opts...)
+	}
+}
+
+// ByOauthGrants orders the results by oauth_grants terms.
+func ByOauthGrants(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOauthGrantsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newGroupStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -417,5 +440,12 @@ func newEntitiesStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(EntitiesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, EntitiesTable, EntitiesColumn),
+	)
+}
+func newOauthGrantsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OauthGrantsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, OauthGrantsTable, OauthGrantsColumn),
 	)
 }

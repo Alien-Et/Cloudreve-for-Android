@@ -207,6 +207,12 @@ type (
 		ShowReadMe bool `json:"show_read_me,omitempty"`
 	}
 
+	OAuthClientProps struct {
+		Description     string `json:"description,omitempty"`
+		Icon            string `json:"icon,omitempty"`
+		RefreshTokenTTL int64  `json:"refresh_token_ttl,omitempty"` // in seconds, 0 means default
+	}
+
 	FileTypeIconSetting struct {
 		Exts      []string `json:"exts"`
 		Icon      string   `json:"icon,omitempty"`
@@ -362,4 +368,27 @@ const (
 
 const (
 	CipherAES256CTR Cipher = "aes-256-ctr"
+)
+
+const (
+	ScopeProfile               = "profile"
+	ScopeEmail                 = "email"
+	ScopeOpenID                = "openid"
+	ScopeOfflineAccess         = "offline_access"
+	ScopeUserInfoRead          = "UserInfo.Read"
+	ScopeUserInfoWrite         = "UserInfo.Write"
+	ScopeUserSecurityInfoRead  = "UserSecurityInfo.Read"
+	ScopeUserSecurityInfoWrite = "UserSecurityInfo.Write"
+	ScopeWorkflowRead          = "Workflow.Read"
+	ScopeWorkflowWrite         = "Workflow.Write"
+	ScopeAdminRead             = "Admin.Read"
+	ScopeAdminWrite            = "Admin.Write"
+	ScopeFilesRead             = "Files.Read"
+	ScopeFilesWrite            = "Files.Write"
+	ScopeSharesRead            = "Shares.Read"
+	ScopeSharesWrite           = "Shares.Write"
+	ScopeFinanceRead           = "Finance.Read"
+	ScopeFinanceWrite          = "Finance.Write"
+	ScopeDavAccountRead        = "DavAccount.Read"
+	ScopeDavAccountWrite       = "DavAccount.Write"
 )

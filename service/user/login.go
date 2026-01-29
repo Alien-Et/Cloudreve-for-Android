@@ -159,7 +159,10 @@ type (
 func IssueToken(c *gin.Context) (*BuiltinLoginResponse, error) {
 	dep := dependency.FromContext(c)
 	u := inventory.UserFromContext(c)
-	token, err := dep.TokenAuth().Issue(c, u, nil)
+	token, err := dep.TokenAuth().Issue(c, &auth.IssueTokenArgs{
+		User:        u,
+		RootTokenID: nil,
+	})
 	if err != nil {
 		return nil, serializer.NewError(serializer.CodeEncryptError, "Failed to issue token pair", err)
 	}

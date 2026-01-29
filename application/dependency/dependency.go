@@ -87,6 +87,8 @@ type Dep interface {
 	DavAccountClient() inventory.DavAccountClient
 	// DirectLinkClient Creates a new inventory.DirectLinkClient instance for access DB direct link store.
 	DirectLinkClient() inventory.DirectLinkClient
+	// OAuthClientClient Creates a new inventory.OAuthClientClient instance for access DB OAuth client store.
+	OAuthClientClient() inventory.OAuthClientClient
 	// HashIDEncoder Get a singleton hashid.Encoder instance for encoding/decoding hashids.
 	HashIDEncoder() hashid.Encoder
 	// TokenAuth Get a singleton auth.TokenAuth instance for token authentication.
@@ -160,6 +162,7 @@ type dependency struct {
 	davAccountClient      inventory.DavAccountClient
 	directLinkClient      inventory.DirectLinkClient
 	fsEventClient         inventory.FsEventClient
+	oAuthClient           inventory.OAuthClientClient
 	emailClient           email.Driver
 	generalAuth           auth.Auth
 	hashidEncoder         hashid.Encoder
@@ -373,7 +376,7 @@ func (d *dependency) EventHub() eventhub.EventHub {
 	if d.eventHub != nil {
 		return d.eventHub
 	}
-	d.eventHub = eventhub.NewEventHub(d.UserClient(), d.FsEventClient())
+	d.eventHub = eventhub.NewEventHub(d.UserClient(), d.FsEventClient(), d.SettingProvider())
 	return d.eventHub
 }
 
@@ -481,6 +484,14 @@ func (d *dependency) EmailClient(ctx context.Context) email.Driver {
 	}
 
 	return d.emailClient
+}
+
+func (d *dependency) OAuthClientClient() inventory.OAuthClientClient {
+	if d.oAuthClient != nil {
+		return d.oAuthClient
+	}
+
+	return inventory.NewOAuthClientClient(d.DBClient(), d.ConfigProvider().Database().Type)
 }
 
 func (d *dependency) MimeDetector(ctx context.Context) mime.MimeDetector {
@@ -785,7 +796,7 @@ func (d *dependency) TokenAuth() auth.TokenAuth {
 	}
 
 	d.tokenAuth = auth.NewTokenAuth(d.HashIDEncoder(), d.SettingProvider(),
-		[]byte(d.SettingProvider().SecretKey(context.Background())), d.UserClient(), d.Logger(), d.KV())
+		[]byte(d.SettingProvider().SecretKey(context.Background())), d.UserClient(), d.Logger(), d.KV(), d.OAuthClientClient())
 	return d.tokenAuth
 }
 

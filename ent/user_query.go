@@ -16,6 +16,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/ent/file"
 	"github.com/cloudreve/Cloudreve/v4/ent/fsevent"
 	"github.com/cloudreve/Cloudreve/v4/ent/group"
+	"github.com/cloudreve/Cloudreve/v4/ent/oauthgrant"
 	"github.com/cloudreve/Cloudreve/v4/ent/passkey"
 	"github.com/cloudreve/Cloudreve/v4/ent/predicate"
 	"github.com/cloudreve/Cloudreve/v4/ent/share"
@@ -38,6 +39,7 @@ type UserQuery struct {
 	withTasks       *TaskQuery
 	withFsevents    *FsEventQuery
 	withEntities    *EntityQuery
+	withOauthGrants *OAuthGrantQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -250,6 +252,28 @@ func (uq *UserQuery) QueryEntities() *EntityQuery {
 	return query
 }
 
+// QueryOauthGrants chains the current query on the "oauth_grants" edge.
+func (uq *UserQuery) QueryOauthGrants() *OAuthGrantQuery {
+	query := (&OAuthGrantClient{config: uq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := uq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := uq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(oauthgrant.Table, oauthgrant.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.OauthGrantsTable, user.OauthGrantsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(uq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
 // First returns the first User entity from the query.
 // Returns a *NotFoundError when no User was found.
 func (uq *UserQuery) First(ctx context.Context) (*User, error) {
@@ -450,6 +474,7 @@ func (uq *UserQuery) Clone() *UserQuery {
 		withTasks:       uq.withTasks.Clone(),
 		withFsevents:    uq.withFsevents.Clone(),
 		withEntities:    uq.withEntities.Clone(),
+		withOauthGrants: uq.withOauthGrants.Clone(),
 		// clone intermediate query.
 		sql:  uq.sql.Clone(),
 		path: uq.path,
@@ -544,6 +569,17 @@ func (uq *UserQuery) WithEntities(opts ...func(*EntityQuery)) *UserQuery {
 	return uq
 }
 
+// WithOauthGrants tells the query-builder to eager-load the nodes that are connected to
+// the "oauth_grants" edge. The optional arguments are used to configure the query builder of the edge.
+func (uq *UserQuery) WithOauthGrants(opts ...func(*OAuthGrantQuery)) *UserQuery {
+	query := (&OAuthGrantClient{config: uq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	uq.withOauthGrants = query
+	return uq
+}
+
 // GroupBy is used to group vertices by one or more fields/columns.
 // It is often used with aggregate functions, like: count, max, mean, min, sum.
 //
@@ -622,7 +658,7 @@ func (uq *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 	var (
 		nodes       = []*User{}
 		_spec       = uq.querySpec()
-		loadedTypes = [8]bool{
+		loadedTypes = [9]bool{
 			uq.withGroup != nil,
 			uq.withFiles != nil,
 			uq.withDavAccounts != nil,
@@ -631,6 +667,7 @@ func (uq *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 			uq.withTasks != nil,
 			uq.withFsevents != nil,
 			uq.withEntities != nil,
+			uq.withOauthGrants != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -703,6 +740,13 @@ func (uq *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		if err := uq.loadEntities(ctx, query, nodes,
 			func(n *User) { n.Edges.Entities = []*Entity{} },
 			func(n *User, e *Entity) { n.Edges.Entities = append(n.Edges.Entities, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := uq.withOauthGrants; query != nil {
+		if err := uq.loadOauthGrants(ctx, query, nodes,
+			func(n *User) { n.Edges.OauthGrants = []*OAuthGrant{} },
+			func(n *User, e *OAuthGrant) { n.Edges.OauthGrants = append(n.Edges.OauthGrants, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -944,6 +988,36 @@ func (uq *UserQuery) loadEntities(ctx context.Context, query *EntityQuery, nodes
 		node, ok := nodeids[fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "created_by" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (uq *UserQuery) loadOauthGrants(ctx context.Context, query *OAuthGrantQuery, nodes []*User, init func(*User), assign func(*User, *OAuthGrant)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(oauthgrant.FieldUserID)
+	}
+	query.Where(predicate.OAuthGrant(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.OauthGrantsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.UserID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "user_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}

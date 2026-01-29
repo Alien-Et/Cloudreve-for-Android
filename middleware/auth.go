@@ -271,3 +271,19 @@ func IsAdmin() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// RequiredScopes checks if the JWT token has the required scopes.
+// If the token has scopes (hasScopes is true), it verifies the token has all required scopes.
+// Write scopes implicitly include Read scopes for the same resource (e.g., "File.Write" includes "File.Read").
+// If hasScopes is false (e.g., session-based auth), the check is skipped.
+func RequiredScopes(requiredScopes ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if err := auth.CheckScope(c, requiredScopes...); err != nil {
+			c.JSON(200, serializer.Err(c, err))
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}

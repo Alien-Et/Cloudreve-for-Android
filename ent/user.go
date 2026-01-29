@@ -68,9 +68,11 @@ type UserEdges struct {
 	Fsevents []*FsEvent `json:"fsevents,omitempty"`
 	// Entities holds the value of the entities edge.
 	Entities []*Entity `json:"entities,omitempty"`
+	// OauthGrants holds the value of the oauth_grants edge.
+	OauthGrants []*OAuthGrant `json:"oauth_grants,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [8]bool
+	loadedTypes [9]bool
 }
 
 // GroupOrErr returns the Group value or an error if the edge
@@ -147,6 +149,15 @@ func (e UserEdges) EntitiesOrErr() ([]*Entity, error) {
 		return e.Entities, nil
 	}
 	return nil, &NotLoadedError{edge: "entities"}
+}
+
+// OauthGrantsOrErr returns the OauthGrants value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) OauthGrantsOrErr() ([]*OAuthGrant, error) {
+	if e.loadedTypes[8] {
+		return e.OauthGrants, nil
+	}
+	return nil, &NotLoadedError{edge: "oauth_grants"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -311,6 +322,11 @@ func (u *User) QueryEntities() *EntityQuery {
 	return NewUserClient(u.config).QueryEntities(u)
 }
 
+// QueryOauthGrants queries the "oauth_grants" edge of the User entity.
+func (u *User) QueryOauthGrants() *OAuthGrantQuery {
+	return NewUserClient(u.config).QueryOauthGrants(u)
+}
+
 // Update returns a builder for updating this User.
 // Note that you need to call User.Unwrap() before calling this method if this User
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -419,6 +435,12 @@ func (e *User) SetFsevents(v []*FsEvent) {
 func (e *User) SetEntities(v []*Entity) {
 	e.Edges.Entities = v
 	e.Edges.loadedTypes[7] = true
+}
+
+// SetOauthGrants manually set the edge as loaded state.
+func (e *User) SetOauthGrants(v []*OAuthGrant) {
+	e.Edges.OauthGrants = v
+	e.Edges.loadedTypes[8] = true
 }
 
 // Users is a parsable slice of User.
