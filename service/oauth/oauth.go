@@ -48,10 +48,10 @@ type (
 		ClientID            string `json:"client_id" binding:"required"`
 		ResponseType        string `json:"response_type" binding:"required,eq=code"`
 		RedirectURI         string `json:"redirect_uri" binding:"required"`
-		State               string `json:"state" binding:"max=255"`
+		State               string `json:"state" binding:"max=4096"`
 		Scope               string `json:"scope" binding:"required"`
 		CodeChallenge       string `json:"code_challenge" binding:"max=255"`
-		CodeChallengeMethod string `json:"code_challenge_method" binding:"eq=S256,omitempty"`
+		CodeChallengeMethod string `json:"code_challenge_method" binding:"omitempty,eq=S256"`
 	}
 )
 
@@ -60,6 +60,9 @@ func (s *GrantService) Get(c *gin.Context) (*GrantResponse, error) {
 	user := inventory.UserFromContext(c)
 	kv := dep.KV()
 	oAuthClient := dep.OAuthClientClient()
+	if s.CodeChallenge != "" && s.CodeChallengeMethod == "" {
+		s.CodeChallengeMethod = "S256"
+	}
 
 	// 1. Get app registration and grant
 	app, err := oAuthClient.GetByGUIDWithGrants(c, s.ClientID, user.ID)

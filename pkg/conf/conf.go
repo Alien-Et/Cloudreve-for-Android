@@ -33,7 +33,7 @@ func NewIniConfigProvider(configPath string, l logging.Logger) (ConfigProvider, 
 		l.Info("Config file %q not found, creating a new one.", configPath)
 		// 创建初始配置文件
 		confContent := util.Replace(map[string]string{
-			"{SessionSecret}": util.RandStringRunes(64),
+			"{SessionSecret}": util.RandStringRunesCrypto(64),
 		}, defaultConf)
 		f, err := util.CreatNestedFile(configPath)
 		if err != nil {

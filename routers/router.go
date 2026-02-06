@@ -326,7 +326,7 @@ func initMasterRouter(dep dependency.Dep) *gin.Engine {
 					controllers.GetAppRegistration,
 				)
 				oauthRouter.POST("consent",
-					middleware.Logging(),
+					middleware.LoginRequired(),
 					controllers.FromJSON[oauth.GrantService](oauth.GrantParamCtx{}),
 					controllers.GrantAppConsent,
 				)

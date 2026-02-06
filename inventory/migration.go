@@ -15,6 +15,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/ent/oauthclient"
 	"github.com/cloudreve/Cloudreve/v4/ent/setting"
 	"github.com/cloudreve/Cloudreve/v4/ent/storagepolicy"
+	"github.com/cloudreve/Cloudreve/v4/inventory/debug"
 	"github.com/cloudreve/Cloudreve/v4/inventory/types"
 	"github.com/cloudreve/Cloudreve/v4/pkg/boolset"
 	"github.com/cloudreve/Cloudreve/v4/pkg/cache"
@@ -561,6 +562,19 @@ var patches = []Patch{
 			newThumbSuffix := fmt.Sprintf("{blob_path}/{blob_name}%s", thumbSuffixSetting.Value)
 			if _, err := client.Setting.UpdateOne(thumbSuffixSetting).SetValue(newThumbSuffix).Save(ctx); err != nil {
 				return fmt.Errorf("failed to update thumb_entity_suffix setting: %w", err)
+			}
+
+			return nil
+		},
+	},
+	{
+		Name:       "reset_secret_key",
+		EndVersion: "4.13.0",
+		Func: func(l logging.Logger, client *ent.Client, ctx context.Context) error {
+			newSecretKey := util.RandStringRunesCrypto(256)
+			ctx = context.WithValue(ctx, debug.SkipDbLogging{}, true)
+			if err := client.Setting.Update().Where(setting.Name("secret_key")).SetValue(newSecretKey).Exec(ctx); err != nil {
+				return fmt.Errorf("failed to update secret_key setting: %w", err)
 			}
 
 			return nil

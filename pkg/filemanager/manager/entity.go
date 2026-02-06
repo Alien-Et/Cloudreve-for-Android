@@ -17,7 +17,6 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/pkg/hashid"
 	"github.com/cloudreve/Cloudreve/v4/pkg/serializer"
 	"github.com/gofrs/uuid"
-	"github.com/samber/lo"
 )
 
 type (
@@ -153,13 +152,7 @@ func (m *manager) GetUrlForRedirectedDirectLink(ctx context.Context, dl *ent.Dir
 	}
 
 	// Find primary entity
-	target, found := lo.Find(file.Entities(), func(entity fs.Entity) bool {
-		return entity.ID() == file.PrimaryEntityID()
-	})
-	if !found {
-		return "", nil, fs.ErrDirectLinkInvalid.WithError(fmt.Errorf("primary entity not found"))
-	}
-	primaryEntity := target
+	primaryEntity := file.PrimaryEntity()
 
 	// Generate url
 	var (

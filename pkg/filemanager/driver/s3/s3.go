@@ -420,9 +420,14 @@ func (handler *Driver) Meta(ctx context.Context, path string) (*MetaData, error)
 		return nil, err
 	}
 
+	etag := ""
+	if res.ETag != nil {
+		etag = *res.ETag
+	}
+
 	return &MetaData{
 		Size: *res.ContentLength,
-		Etag: *res.ETag,
+		Etag: etag,
 	}, nil
 
 }

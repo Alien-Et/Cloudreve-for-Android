@@ -60,7 +60,7 @@ func (m *manager) CreateViewerSession(ctx context.Context, uri *fs.URI, version 
 	}
 
 	sessionID := uuid.Must(uuid.NewV4()).String()
-	token := util.RandStringRunes(128)
+	token := util.RandStringRunesCrypto(128)
 	sessionCache := &ViewerSessionCache{
 		ID:       sessionID,
 		Uri:      file.Uri(false).String(),

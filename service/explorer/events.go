@@ -97,6 +97,12 @@ func (s *ExplorerEventService) HandleExplorerEventsPush(c *gin.Context) error {
 			c.SSEvent("event", evt)
 			l.Debug("Event sent: %+v", evt)
 			c.Writer.Flush()
+			if c.Errors.Last() != nil {
+				l.Error("Error occurred: %+v", c.Errors.Last().Error())
+				eventHub.Unsubscribe(c, parent.ID(), requestInfo.ClientID)
+				l.Debug("Unsubscribed from event hub")
+				return nil
+			}
 		case <-keepAliveTicker.C:
 			c.SSEvent("keep-alive", nil)
 			c.Writer.Flush()

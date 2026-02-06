@@ -343,7 +343,7 @@ func siteUrlPreProcessor(ctx context.Context, settings map[string]string) error 
 }
 
 func secretKeyPreProcessor(ctx context.Context, settings map[string]string) error {
-	settings["secret_key"] = util.RandStringRunes(256)
+	settings["secret_key"] = util.RandStringRunesCrypto(256)
 	return nil
 }
 

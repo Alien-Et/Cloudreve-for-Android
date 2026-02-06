@@ -201,7 +201,7 @@ func (c *oauthClientClient) Create(ctx context.Context, client *ent.OAuthClient)
 		client.GUID = uuid.Must(uuid.NewV4()).String()
 	}
 	if client.Secret == "" {
-		client.Secret = util.RandStringRunes(32)
+		client.Secret = util.RandStringRunesCrypto(32)
 	}
 
 	return c.client.OAuthClient.Create().

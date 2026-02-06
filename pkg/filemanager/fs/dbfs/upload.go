@@ -247,7 +247,7 @@ func (f *DBFS) PrepareUpload(ctx context.Context, req *fs.UploadRequest, opts ..
 		EntityID:       entityId,
 		UID:            f.user.ID,
 		Policy:         policy,
-		CallbackSecret: util.RandStringRunes(32),
+		CallbackSecret: util.RandStringRunesCrypto(32),
 		LockToken:      lockToken, // Prevent lock being released.
 	}
 
