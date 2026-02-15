@@ -747,3 +747,25 @@ func (s *ArchiveListFilesService) List(c *gin.Context) (*ArchiveListFilesRespons
 
 	return BuildArchiveListFilesResponse(files), nil
 }
+
+type (
+	FulltextSearchParamCtx struct{}
+	FulltextSearchService  struct {
+		Query  string `form:"query" binding:"required"`
+		Offset int    `form:"offset"`
+	}
+)
+
+func (s *FulltextSearchService) Search(c *gin.Context) (*FullTextSearchResults, error) {
+	dep := dependency.FromContext(c)
+	user := inventory.UserFromContext(c)
+	m := manager.NewFileManager(dep, user)
+	defer m.Recycle()
+
+	results, err := m.SearchFullText(c, s.Query, s.Offset)
+	if err != nil {
+		return nil, serializer.NewError(serializer.CodeInternalSetting, "failed to search full text", err)
+	}
+
+	return BuildFullTextSearchResults(c, user, dep.HashIDEncoder(), results), nil
+}

@@ -282,7 +282,6 @@ func (m *manager) RecycleEntities(ctx context.Context, force bool, entityIDs ...
 			if err := inventory.CommitWithStorageDiff(ctx, tx, m.l, m.dep.UserClient()); err != nil {
 				return fmt.Errorf("failed to commit delete change: %w", err)
 			}
-
 		}
 	}
 

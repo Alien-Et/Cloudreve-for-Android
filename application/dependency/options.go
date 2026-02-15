@@ -11,6 +11,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/pkg/email"
 	"github.com/cloudreve/Cloudreve/v4/pkg/hashid"
 	"github.com/cloudreve/Cloudreve/v4/pkg/logging"
+	"github.com/cloudreve/Cloudreve/v4/pkg/searcher"
 	"github.com/cloudreve/Cloudreve/v4/pkg/setting"
 	"github.com/gin-contrib/static"
 )
@@ -156,5 +157,19 @@ func WithFileClient(s inventory.FileClient) Option {
 func WithShareClient(s inventory.ShareClient) Option {
 	return optionFunc(func(o *dependency) {
 		o.shareClient = s
+	})
+}
+
+// WithSearchIndexer Set the default search indexer
+func WithSearchIndexer(s searcher.SearchIndexer) Option {
+	return optionFunc(func(o *dependency) {
+		o.searchIndexer = s
+	})
+}
+
+// WithTextExtractor Set the default text extractor
+func WithTextExtractor(s searcher.TextExtractor) Option {
+	return optionFunc(func(o *dependency) {
+		o.textExtractor = s
 	})
 }

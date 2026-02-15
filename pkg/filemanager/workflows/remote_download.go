@@ -73,6 +73,7 @@ const (
 	SummaryKeySrcMultiple    = "src_multiple"
 	SummaryKeySrcDstPolicyID = "dst_policy_id"
 	SummaryKeyFailed         = "failed"
+	SummaryKeyTotal          = "total"
 )
 
 func init() {

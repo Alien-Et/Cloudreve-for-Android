@@ -369,18 +369,18 @@ func (f *DBFS) CompleteUpload(ctx context.Context, session *fs.UploadSession) (f
 // - File still locked by uplaod session
 // - File unlocked, upload session valid
 // - File unlocked, upload session not valid
-func (f *DBFS) CancelUploadSession(ctx context.Context, path *fs.URI, sessionID string, session *fs.UploadSession) ([]fs.Entity, error) {
+func (f *DBFS) CancelUploadSession(ctx context.Context, path *fs.URI, sessionID string, session *fs.UploadSession) ([]fs.Entity, *fs.IndexDiff, error) {
 	// Get placeholder file
 	file, err := f.Get(ctx, path, WithFileEntities(), WithNotRoot())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get placeholder file: %w", err)
+		return nil, nil, fmt.Errorf("failed to get placeholder file: %w", err)
 	}
 
 	filePrivate := file.(*File)
 
 	// Make sure presented upload session is valid
 	if session != nil && (session.UID != f.user.ID || session.FileID != file.ID()) {
-		return nil, serializer.NewError(serializer.CodeNotFound, "Upload session not found", nil)
+		return nil, nil, serializer.NewError(serializer.CodeNotFound, "Upload session not found", nil)
 	}
 
 	// Confirm locks on placeholder file
@@ -393,7 +393,7 @@ func (f *DBFS) CancelUploadSession(ctx context.Context, path *fs.URI, sessionID 
 	}
 
 	if _, ok := ctx.Value(ByPassOwnerCheckCtxKey{}).(bool); !ok && filePrivate.OwnerID() != f.user.ID {
-		return nil, fs.ErrOwnerOnly
+		return nil, nil, fs.ErrOwnerOnly
 	}
 
 	// Lock file
@@ -402,7 +402,7 @@ func (f *DBFS) CancelUploadSession(ctx context.Context, path *fs.URI, sessionID 
 	defer func() { _ = f.Release(ctx, ls) }()
 	ctx = fs.LockSessionToContext(ctx, ls)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Find placeholder entity
@@ -416,12 +416,12 @@ func (f *DBFS) CancelUploadSession(ctx context.Context, path *fs.URI, sessionID 
 
 	// Remove upload session metadata
 	if err := f.fileClient.RemoveMetadata(ctx, filePrivate.Model, MetadataUploadSessionID, ThumbDisabledKey); err != nil {
-		return nil, serializer.NewError(serializer.CodeDBError, "Failed to remove upload session metadata", err)
+		return nil, nil, serializer.NewError(serializer.CodeDBError, "Failed to remove upload session metadata", err)
 	}
 
 	if entity == nil {
 		// Given upload session does not exist
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	if session != nil && session.LockToken != "" {
@@ -434,18 +434,19 @@ func (f *DBFS) CancelUploadSession(ctx context.Context, path *fs.URI, sessionID 
 
 	if len(filePrivate.Entities()) == 1 {
 		// Only one placeholder entity, just delete this file
-		return f.Delete(ctx, []*fs.URI{path})
+		entities, indexDiff, err := f.Delete(ctx, []*fs.URI{path})
+		return entities, indexDiff, err
 	}
 
 	// Delete place holder entity
 	storageDiff, err := f.deleteEntity(ctx, filePrivate, entity.ID())
 	if err != nil {
-		return nil, fmt.Errorf("failed to delete placeholder entity: %w", err)
+		return nil, nil, fmt.Errorf("failed to delete placeholder entity: %w", err)
 	}
 
 	if err := f.userClient.ApplyStorageDiff(ctx, storageDiff); err != nil {
-		return nil, fmt.Errorf("failed to apply storage diff: %w", err)
+		return nil, nil, fmt.Errorf("failed to apply storage diff: %w", err)
 	}
 
-	return nil, nil
+	return nil, nil, nil
 }

@@ -105,6 +105,12 @@ const (
 	RemoteDownloadTaskType        = "remote_download"
 	ImportTaskType                = "import"
 
+	FullTextIndexTaskType       = "full_text_index"
+	FullTextCopyTaskType        = "full_text_copy"
+	FullTextChangeOwnerTaskType = "full_text_change_owner"
+	FullTextDeleteTaskType      = "full_text_delete"
+	FullTextRebuildTaskType     = "full_text_rebuild"
+
 	SlaveCreateArchiveTaskType = "slave_create_archive"
 	SlaveUploadTaskType        = "slave_upload"
 	SlaveExtractArchiveType    = "slave_extract_archive"

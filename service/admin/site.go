@@ -263,6 +263,14 @@ var (
 		"queue_remote_download_max_retry":            remoteDownloadQueuePostProcessor,
 		"queue_remote_download_retry_delay":          remoteDownloadQueuePostProcessor,
 		"secret_key":                                 secretKeyPostProcessor,
+		"fts_meilisearch_embed_config":               meilisearchPostProcessor,
+		"fts_meilisearch_endpoint":                   meilisearchPostProcessor,
+		"fts_meilisearch_api_key":                    meilisearchPostProcessor,
+		"fts_meilisearch_embed_enabled":              meilisearchPostProcessor,
+		"fts_meilisearch_page_size":                  meilisearchPostProcessor,
+		"fts_tika_endpoint":                          tikaPostProcessor,
+		"fts_tika_exts":                              tikaPostProcessor,
+		"fts_tika_max_file_size":                     tikaPostProcessor,
 	}
 )
 
@@ -409,5 +417,17 @@ func secretKeyPostProcessor(ctx context.Context, settings map[string]string) err
 	dep := dependency.FromContext(ctx)
 	dep.KV().Delete(manager.EntityUrlCacheKeyPrefix)
 	settings["secret_key"] = ""
+	return nil
+}
+
+func meilisearchPostProcessor(ctx context.Context, settings map[string]string) error {
+	dep := dependency.FromContext(ctx)
+	dep.SearchIndexer(context.WithValue(ctx, dependency.ReloadCtx{}, true))
+	return nil
+}
+
+func tikaPostProcessor(ctx context.Context, settings map[string]string) error {
+	dep := dependency.FromContext(ctx)
+	dep.TextExtractor(context.WithValue(ctx, dependency.ReloadCtx{}, true))
 	return nil
 }

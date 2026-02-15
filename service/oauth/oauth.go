@@ -16,6 +16,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/pkg/serializer"
 	"github.com/cloudreve/Cloudreve/v4/pkg/util"
 	"github.com/gin-gonic/gin"
+	"github.com/samber/lo"
 )
 
 type (
@@ -88,6 +89,11 @@ func (s *GrantService) Get(c *gin.Context) (*GrantResponse, error) {
 	// Validate requested scopes: must be a subset of registered app scopes
 	if !auth.ValidateScopes(requestedScopes, app.Scopes) {
 		return nil, serializer.NewError(serializer.CodeParamErr, "Invalid scope requested", nil)
+	}
+
+	// Must have openid scope
+	if !lo.Contains(requestedScopes, types.ScopeOpenID) {
+		return nil, serializer.NewError(serializer.CodeParamErr, "openid scope required", nil)
 	}
 
 	// 3. Create/update grant

@@ -57,6 +57,8 @@ type (
 		CreateViewerSession(ctx context.Context, uri *fs.URI, version string, viewer *types.Viewer) (*ViewerSession, error)
 		// TraverseFile traverses a file to its root file, return the file with linked root.
 		TraverseFile(ctx context.Context, fileID int) (fs.File, error)
+		// SearchFullText searches full text for given query and offset
+		SearchFullText(ctx context.Context, query string, offset int) (*FullTextSearchResults, error)
 	}
 
 	FsManagement interface {
@@ -119,6 +121,16 @@ type (
 		Expire          *time.Time
 		ShareView       bool
 		ShowReadMe      bool
+	}
+
+	FullTextSearchResults struct {
+		Hits  []FullTextSearchResult
+		Total int64
+	}
+
+	FullTextSearchResult struct {
+		File    fs.File
+		Content string
 	}
 )
 

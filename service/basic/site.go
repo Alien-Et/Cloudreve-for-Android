@@ -54,6 +54,7 @@ type SiteConfig struct {
 	ThumbnailHeight      int                       `json:"thumbnail_height,omitempty"`
 	CustomProps          []types.CustomProps       `json:"custom_props,omitempty"`
 	ShowEncryptionStatus bool                      `json:"show_encryption_status,omitempty"`
+	FullTextSearch       bool                      `json:"full_text_search,omitempty"`
 
 	// Thumbnail section
 	ThumbExts []string `json:"thumb_exts,omitempty"`
@@ -120,6 +121,7 @@ func (s *GetSettingService) GetSiteConfig(c *gin.Context) (*SiteConfig, error) {
 			ThumbnailHeight:      h,
 			CustomProps:          customProps,
 			ShowEncryptionStatus: showEncryptionStatus,
+			FullTextSearch:       settings.FTSEnabled(c),
 		}, nil
 	case "emojis":
 		emojis := settings.EmojiPresets(c)

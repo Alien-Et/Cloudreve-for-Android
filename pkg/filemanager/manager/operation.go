@@ -138,11 +138,19 @@ func (m *manager) Create(ctx context.Context, path *fs.URI, fileType types.FileT
 }
 
 func (m *manager) Rename(ctx context.Context, path *fs.URI, newName string) (fs.File, error) {
-	return m.fs.Rename(ctx, path, newName)
+	file, indexDiff, err := m.fs.Rename(ctx, path, newName)
+	m.processIndexDiff(ctx, indexDiff)
+	return file, err
 }
 
 func (m *manager) MoveOrCopy(ctx context.Context, src []*fs.URI, dst *fs.URI, isCopy bool) error {
-	return m.fs.MoveOrCopy(ctx, src, dst, isCopy)
+	indexDiff, err := m.fs.MoveOrCopy(ctx, src, dst, isCopy)
+	if err != nil {
+		return err
+	}
+
+	m.processIndexDiff(ctx, indexDiff)
+	return nil
 }
 
 func (m *manager) SoftDelete(ctx context.Context, path ...*fs.URI) error {
@@ -159,7 +167,7 @@ func (m *manager) Delete(ctx context.Context, path []*fs.URI, opts ...fs.Option)
 		return m.SoftDelete(ctx, path...)
 	}
 
-	staleEntities, err := m.fs.Delete(ctx, path, fs.WithUnlinkOnly(o.UnlinkOnly), fs.WithSysSkipSoftDelete(o.SysSkipSoftDelete))
+	staleEntities, indexDiff, err := m.fs.Delete(ctx, path, fs.WithUnlinkOnly(o.UnlinkOnly), fs.WithSysSkipSoftDelete(o.SysSkipSoftDelete))
 	if err != nil {
 		return err
 	}
@@ -179,6 +187,12 @@ func (m *manager) Delete(ctx context.Context, path []*fs.URI, opts ...fs.Option)
 			return fmt.Errorf("failed to queue explicit entity recycle task: %w", err)
 		}
 	}
+
+	// Process index diff
+	if indexDiff != nil {
+		m.processIndexDiff(ctx, indexDiff)
+	}
+
 	return nil
 }
 

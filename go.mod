@@ -29,7 +29,7 @@ require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/go-webauthn/webauthn v0.11.2
 	github.com/gofrs/uuid v4.0.0+incompatible
-	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/gomodule/redigo v1.9.2
 	github.com/google/go-querystring v1.1.0
 	github.com/google/uuid v1.6.0
@@ -42,6 +42,7 @@ require (
 	github.com/juju/ratelimit v1.0.1
 	github.com/ks3sdklib/aws-sdk-go v1.6.2
 	github.com/lib/pq v1.10.9
+	github.com/meilisearch/meilisearch-go v0.36.0
 	github.com/mholt/archives v0.1.3
 	github.com/mojocn/base64Captcha v0.0.0-20190801020520-752b1cd608b2
 	github.com/pquerna/otp v1.2.0

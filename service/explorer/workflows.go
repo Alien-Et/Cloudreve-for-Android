@@ -450,3 +450,34 @@ func (service *SetDownloadFilesService) SetDownloadFiles(c *gin.Context, taskID 
 
 	return nil
 }
+
+type (
+	RebuildFTSIndexWorkflowService struct {
+		FilteredStoragePolicy []int `json:"filtered_storage_policy"`
+	}
+	CreateRebuildFTSIndexParamCtx struct{}
+)
+
+func (service *RebuildFTSIndexWorkflowService) CreateRebuildFTSIndexTask(c *gin.Context) (*TaskResponse, error) {
+	dep := dependency.FromContext(c)
+	user := inventory.UserFromContext(c)
+	hasher := dep.HashIDEncoder()
+	m := manager.NewFileManager(dep, user)
+	defer m.Recycle()
+
+	if !user.Edges.Group.Permissions.Enabled(int(types.GroupPermissionIsAdmin)) {
+		return nil, serializer.NewError(serializer.CodeGroupNotAllowed, "Only admin can import files", nil)
+	}
+
+	// Create task
+	t, err := workflows.NewRebuildIndexTask(c, user, service.FilteredStoragePolicy)
+	if err != nil {
+		return nil, serializer.NewError(serializer.CodeCreateTaskError, "Failed to create task", err)
+	}
+
+	if err := dep.MediaMetaQueue(c).QueueTask(c, t); err != nil {
+		return nil, serializer.NewError(serializer.CodeCreateTaskError, "Failed to queue task", err)
+	}
+
+	return BuildTaskResponse(t, nil, hasher), nil
+}

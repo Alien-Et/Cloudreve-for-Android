@@ -66,6 +66,8 @@ const (
 	ThumbMetadataPrefix = "thumb:"
 	ThumbDisabledKey    = ThumbMetadataPrefix + "disabled"
 
+	FullTextIndexKey = MetadataSysPrefix + "fulltext_index"
+
 	pathIndexRoot = 0
 	pathIndexUser = 1
 )

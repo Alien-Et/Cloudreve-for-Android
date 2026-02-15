@@ -147,47 +147,48 @@ func (f *DBFS) Create(ctx context.Context, path *fs.URI, fileType types.FileType
 	return ancestor, nil
 }
 
-func (f *DBFS) Rename(ctx context.Context, path *fs.URI, newName string) (fs.File, error) {
+func (f *DBFS) Rename(ctx context.Context, path *fs.URI, newName string) (fs.File, *fs.IndexDiff, error) {
 	// Get navigator
 	navigator, err := f.getNavigator(ctx, path, NavigatorCapabilityRenameFile, NavigatorCapabilityLockFile)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Get target file
+	ctx = context.WithValue(ctx, inventory.LoadFileMetadata{}, true)
 	target, err := f.getFileByPath(ctx, navigator, path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get target file: %w", err)
+		return nil, nil, fmt.Errorf("failed to get target file: %w", err)
 	}
 	oldName := target.Name()
 
 	if _, ok := ctx.Value(ByPassOwnerCheckCtxKey{}).(bool); !ok && target.Owner().ID != f.user.ID {
-		return nil, fs.ErrOwnerOnly
+		return nil, nil, fs.ErrOwnerOnly
 	}
 
 	// Root folder cannot be modified
 	if target.IsRootFolder() {
-		return nil, fs.ErrNotSupportedAction.WithError(fmt.Errorf("cannot modify root folder"))
+		return nil, nil, fs.ErrNotSupportedAction.WithError(fmt.Errorf("cannot modify root folder"))
 	}
 
 	// Validate new name
 	if err := validateFileName(newName); err != nil {
-		return nil, fs.ErrIllegalObjectName.WithError(err)
+		return nil, nil, fs.ErrIllegalObjectName.WithError(err)
 	}
 
 	// If target is a file, validate file extension
 	policy, err := f.getPreferredPolicy(ctx, target)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if target.Type() == types.FileTypeFile {
 		if err := validateExtension(newName, policy); err != nil {
-			return nil, fs.ErrIllegalObjectName.WithError(err)
+			return nil, nil, fs.ErrIllegalObjectName.WithError(err)
 		}
 
 		if err := validateFileNameRegexp(newName, policy); err != nil {
-			return nil, fs.ErrIllegalObjectName.WithError(err)
+			return nil, nil, fs.ErrIllegalObjectName.WithError(err)
 		}
 	}
 
@@ -196,39 +197,54 @@ func (f *DBFS) Rename(ctx context.Context, path *fs.URI, newName string) (fs.Fil
 		&LockByPath{target.Uri(true), target, target.Type(), ""})
 	defer func() { _ = f.Release(ctx, ls) }()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Rename target
 	fc, tx, ctx, err := inventory.WithTx(ctx, f.fileClient)
 	if err != nil {
-		return nil, serializer.NewError(serializer.CodeDBError, "Failed to start transaction", err)
+		return nil, nil, serializer.NewError(serializer.CodeDBError, "Failed to start transaction", err)
 	}
 
 	updated, err := fc.Rename(ctx, target.Model, newName)
 	if err != nil {
 		_ = inventory.Rollback(tx)
 		if ent.IsConstraintError(err) {
-			return nil, fs.ErrFileExisted.WithError(err)
+			return nil, nil, fs.ErrFileExisted.WithError(err)
 		}
 
-		return nil, serializer.NewError(serializer.CodeDBError, "failed to update file", err)
+		return nil, nil, serializer.NewError(serializer.CodeDBError, "failed to update file", err)
 	}
 
 	if target.Type() == types.FileTypeFile && !strings.EqualFold(filepath.Ext(newName), filepath.Ext(oldName)) {
 		if err := fc.RemoveMetadata(ctx, target.Model, ThumbDisabledKey); err != nil {
 			_ = inventory.Rollback(tx)
-			return nil, serializer.NewError(serializer.CodeDBError, "failed to remove disabled thumbnail mark", err)
+			return nil, nil, serializer.NewError(serializer.CodeDBError, "failed to remove disabled thumbnail mark", err)
 		}
 	}
 
 	if err := inventory.Commit(tx); err != nil {
-		return nil, serializer.NewError(serializer.CodeDBError, "Failed to commit rename change", err)
+		return nil, nil, serializer.NewError(serializer.CodeDBError, "Failed to commit rename change", err)
 	}
 
 	f.emitFileRenamed(ctx, target, newName)
 
-	return target.Replace(updated), nil
+	originalMetadata := target.Metadata()
+	newFile := target.Replace(updated)
+	var diff *fs.IndexDiff
+	if _, ok := originalMetadata[FullTextIndexKey]; ok {
+		diff = &fs.IndexDiff{
+			IndexToRename: []fs.IndexDiffRenameDetails{
+				{
+					Uri:      *newFile.Uri(false),
+					FileID:   newFile.ID(),
+					EntityID: newFile.PrimaryEntityID(),
+				},
+			},
+		}
+	}
+
+	return newFile, diff, nil
 }
 
 func (f *DBFS) SoftDelete(ctx context.Context, path ...*fs.URI) error {
@@ -311,7 +327,7 @@ func (f *DBFS) SoftDelete(ctx context.Context, path ...*fs.URI) error {
 	return ae.Aggregate()
 }
 
-func (f *DBFS) Delete(ctx context.Context, path []*fs.URI, opts ...fs.Option) ([]fs.Entity, error) {
+func (f *DBFS) Delete(ctx context.Context, path []*fs.URI, opts ...fs.Option) ([]fs.Entity, *fs.IndexDiff, error) {
 	o := newDbfsOption()
 	for _, opt := range opts {
 		o.apply(opt)
@@ -362,7 +378,7 @@ func (f *DBFS) Delete(ctx context.Context, path []*fs.URI, opts ...fs.Option) ([
 
 	targets := lo.Flatten(lo.Values(fileNavGroup))
 	if len(targets) == 0 {
-		return nil, ae.Aggregate()
+		return nil, nil, ae.Aggregate()
 	}
 	// Lock all targets
 	lockTargets := lo.Map(targets, func(value *File, key int) *LockByPath {
@@ -371,50 +387,55 @@ func (f *DBFS) Delete(ctx context.Context, path []*fs.URI, opts ...fs.Option) ([
 	ls, err := f.acquireByPath(ctx, -1, f.user, false, fs.LockApp(fs.ApplicationDelete), lockTargets...)
 	defer func() { _ = f.Release(ctx, ls) }()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	fc, tx, ctx, err := inventory.WithTx(ctx, f.fileClient)
 	if err != nil {
-		return nil, serializer.NewError(serializer.CodeDBError, "Failed to start transaction", err)
+		return nil, nil, serializer.NewError(serializer.CodeDBError, "Failed to start transaction", err)
 	}
 
 	// Delete targets
-	newStaleEntities, storageDiff, err := f.deleteFiles(ctx, fileNavGroup, fc, opt)
+	newStaleEntities, storageDiff, indexToDelete, err := f.deleteFiles(ctx, fileNavGroup, fc, opt)
 	if err != nil {
 		_ = inventory.Rollback(tx)
-		return nil, serializer.NewError(serializer.CodeDBError, "failed to delete files", err)
+		return nil, nil, serializer.NewError(serializer.CodeDBError, "failed to delete files", err)
 	}
 
 	tx.AppendStorageDiff(storageDiff)
 	if err := inventory.CommitWithStorageDiff(ctx, tx, f.l, f.userClient); err != nil {
-		return nil, serializer.NewError(serializer.CodeDBError, "Failed to commit delete change", err)
+		return nil, nil, serializer.NewError(serializer.CodeDBError, "Failed to commit delete change", err)
 	}
 	f.emitFileDeleted(ctx, targets...)
-	return newStaleEntities, ae.Aggregate()
+	return newStaleEntities, &fs.IndexDiff{
+		IndexToDelete: indexToDelete,
+	}, ae.Aggregate()
 }
 
-func (f *DBFS) VersionControl(ctx context.Context, path *fs.URI, versionId int, delete bool) error {
+func (f *DBFS) VersionControl(ctx context.Context, path *fs.URI, versionId int, delete bool) (*fs.IndexDiff, error) {
 	// Get navigator
 	navigator, err := f.getNavigator(ctx, path, NavigatorCapabilityVersionControl)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Get target file
 	ctx = context.WithValue(ctx, inventory.LoadFileEntity{}, true)
+	if !delete {
+		ctx = context.WithValue(ctx, inventory.LoadFileMetadata{}, true)
+	}
 	target, err := f.getFileByPath(ctx, navigator, path)
 	if err != nil {
-		return fmt.Errorf("failed to get target file: %w", err)
+		return nil, fmt.Errorf("failed to get target file: %w", err)
 	}
 
 	if _, ok := ctx.Value(ByPassOwnerCheckCtxKey{}).(bool); !ok && target.Owner().ID != f.user.ID {
-		return fs.ErrOwnerOnly
+		return nil, fs.ErrOwnerOnly
 	}
 
 	// Target must be a file
 	if target.Type() != types.FileTypeFile {
-		return fs.ErrNotSupportedAction.WithError(fmt.Errorf("target must be a valid file"))
+		return nil, fs.ErrNotSupportedAction.WithError(fmt.Errorf("target must be a valid file"))
 	}
 
 	// Lock file
@@ -422,21 +443,38 @@ func (f *DBFS) VersionControl(ctx context.Context, path *fs.URI, versionId int, 
 		&LockByPath{target.Uri(true), target, target.Type(), ""})
 	defer func() { _ = f.Release(ctx, ls) }()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if delete {
 		storageDiff, err := f.deleteEntity(ctx, target, versionId)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if err := f.userClient.ApplyStorageDiff(ctx, storageDiff); err != nil {
 			f.l.Error("Failed to apply storage diff after deleting version: %s", err)
 		}
-		return nil
+		return nil, nil
 	} else {
-		return f.setCurrentVersion(ctx, target, versionId)
+		if err := f.setCurrentVersion(ctx, target, versionId); err != nil {
+			return nil, err
+		}
+
+		if _, ok := target.Metadata()[FullTextIndexKey]; ok {
+			return &fs.IndexDiff{
+				IndexToUpdate: []fs.IndexDiffUpdateDetails{
+					{
+						Uri:      *target.Uri(false),
+						FileID:   target.ID(),
+						OwnerID:  target.Owner().ID,
+						EntityID: versionId,
+					},
+				},
+			}, nil
+		}
+
+		return nil, nil
 	}
 }
 
@@ -484,7 +522,7 @@ func (f *DBFS) Restore(ctx context.Context, path ...*fs.URI) error {
 
 	// Copy each file to its original location
 	for _, uris := range allTrashUriStr {
-		if err := f.MoveOrCopy(ctx, []*fs.URI{uris[0]}, uris[1], false); err != nil {
+		if _, err := f.MoveOrCopy(ctx, []*fs.URI{uris[0]}, uris[1], false); err != nil {
 			if !ae.Merge(err) {
 				ae.Add(uris[0].String(), err)
 			}
@@ -495,26 +533,26 @@ func (f *DBFS) Restore(ctx context.Context, path ...*fs.URI) error {
 
 }
 
-func (f *DBFS) MoveOrCopy(ctx context.Context, path []*fs.URI, dst *fs.URI, isCopy bool) error {
+func (f *DBFS) MoveOrCopy(ctx context.Context, path []*fs.URI, dst *fs.URI, isCopy bool) (*fs.IndexDiff, error) {
 	targets := make([]*File, 0, len(path))
 	dstNavigator, err := f.getNavigator(ctx, dst, NavigatorCapabilityLockFile)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Get destination file
 	destination, err := f.getFileByPath(ctx, dstNavigator, dst)
 	if err != nil {
-		return fmt.Errorf("faield to get destination folder: %w", err)
+		return nil, fmt.Errorf("faield to get destination folder: %w", err)
 	}
 
 	if _, ok := ctx.Value(ByPassOwnerCheckCtxKey{}).(bool); !ok && destination.Owner().ID != f.user.ID {
-		return fs.ErrOwnerOnly
+		return nil, fs.ErrOwnerOnly
 	}
 
 	// Target must be a folder
 	if !destination.CanHaveChildren() {
-		return fs.ErrNotSupportedAction.WithError(fmt.Errorf("destination must be a valid folder"))
+		return nil, fs.ErrNotSupportedAction.WithError(fmt.Errorf("destination must be a valid folder"))
 	}
 
 	ae := serializer.NewAggregateError()
@@ -571,6 +609,7 @@ func (f *DBFS) MoveOrCopy(ctx context.Context, path []*fs.URI, dst *fs.URI, isCo
 		}
 	}
 
+	indexDiff := &fs.IndexDiff{}
 	if len(targets) > 0 {
 		// Lock all targets
 		lockTargets := lo.Map(targets, func(value *File, key int) *LockByPath {
@@ -598,33 +637,35 @@ func (f *DBFS) MoveOrCopy(ctx context.Context, path []*fs.URI, dst *fs.URI, isCo
 		ls, err := f.acquireByPath(ctx, -1, f.user, false, fs.LockApp(fs.ApplicationMoveCopy), allLockTargets...)
 		defer func() { _ = f.Release(ctx, ls) }()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// Start transaction to move files
 		fc, tx, ctx, err := inventory.WithTx(ctx, f.fileClient)
 		if err != nil {
-			return serializer.NewError(serializer.CodeDBError, "Failed to start transaction", err)
+			return nil, serializer.NewError(serializer.CodeDBError, "Failed to start transaction", err)
 		}
 
 		var (
 			copiedNewTargetsMap map[int]*ent.File
 			storageDiff         inventory.StorageDiff
+			indexDiffBatch      *fs.IndexDiff
 		)
 		if isCopy {
-			copiedNewTargetsMap, storageDiff, err = f.copyFiles(ctx, fileNavGroup, destination, fc)
+			copiedNewTargetsMap, storageDiff, indexDiffBatch, err = f.copyFiles(ctx, fileNavGroup, destination, fc)
 		} else {
-			storageDiff, err = f.moveFiles(ctx, targets, destination, fc, dstNavigator)
+			storageDiff, indexDiffBatch, err = f.moveFiles(ctx, targets, destination, fc, dstNavigator)
 		}
 
 		if err != nil {
 			_ = inventory.Rollback(tx)
-			return err
+			return nil, err
 		}
 
+		indexDiff.Merge(indexDiffBatch)
 		tx.AppendStorageDiff(storageDiff)
 		if err := inventory.CommitWithStorageDiff(ctx, tx, f.l, f.userClient); err != nil {
-			return serializer.NewError(serializer.CodeDBError, "Failed to commit move change", err)
+			return nil, serializer.NewError(serializer.CodeDBError, "Failed to commit move change", err)
 		}
 
 		for _, target := range targets {
@@ -638,7 +679,7 @@ func (f *DBFS) MoveOrCopy(ctx context.Context, path []*fs.URI, dst *fs.URI, isCo
 		// TODO: after move, dbfs cache should be cleared
 	}
 
-	return ae.Aggregate()
+	return indexDiff, ae.Aggregate()
 }
 
 func (f *DBFS) GetFileFromDirectLink(ctx context.Context, dl *ent.DirectLink) (fs.File, error) {
@@ -773,17 +814,18 @@ func (f *DBFS) setCurrentVersion(ctx context.Context, target *File, versionId in
 	return nil
 }
 
-func (f *DBFS) deleteFiles(ctx context.Context, targets map[Navigator][]*File, fc inventory.FileClient, opt *types.EntityProps) ([]fs.Entity, inventory.StorageDiff, error) {
+func (f *DBFS) deleteFiles(ctx context.Context, targets map[Navigator][]*File, fc inventory.FileClient, opt *types.EntityProps) ([]fs.Entity, inventory.StorageDiff, []int, error) {
 	if f.user.Edges.Group == nil {
-		return nil, nil, fmt.Errorf("user group not loaded")
+		return nil, nil, nil, fmt.Errorf("user group not loaded")
 	}
 	allStaleEntities := make([]fs.Entity, 0, len(targets))
 	storageDiff := make(inventory.StorageDiff)
+	indexToDelete := make([]int, 0)
 	for n, files := range targets {
 		// Let navigator use tx
 		reset, err := n.FollowTx(ctx)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		defer reset()
@@ -792,9 +834,12 @@ func (f *DBFS) deleteFiles(ctx context.Context, targets map[Navigator][]*File, f
 		toBeDeletedFiles := make([]*File, 0, len(files))
 		if err := n.Walk(ctx, files, intsets.MaxInt, intsets.MaxInt, func(targets []*File, level int) error {
 			toBeDeletedFiles = append(toBeDeletedFiles, targets...)
+			indexToDelete = append(indexToDelete, lo.Map(targets, func(item *File, index int) int {
+				return item.ID()
+			})...)
 			return nil
 		}); err != nil {
-			return nil, nil, fmt.Errorf("failed to walk files: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to walk files: %w", err)
 		}
 
 		// Delete files
@@ -802,7 +847,7 @@ func (f *DBFS) deleteFiles(ctx context.Context, targets map[Navigator][]*File, f
 			return item.Model
 		}), opt)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to delete files: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to delete files: %w", err)
 		}
 		storageDiff.Merge(diff)
 		allStaleEntities = append(allStaleEntities, lo.Map(staleEntities, func(item *ent.Entity, index int) fs.Entity {
@@ -810,17 +855,17 @@ func (f *DBFS) deleteFiles(ctx context.Context, targets map[Navigator][]*File, f
 		})...)
 	}
 
-	return allStaleEntities, storageDiff, nil
+	return allStaleEntities, storageDiff, indexToDelete, nil
 }
 
-func (f *DBFS) copyFiles(ctx context.Context, targets map[Navigator][]*File, destination *File, fc inventory.FileClient) (map[int]*ent.File, inventory.StorageDiff, error) {
+func (f *DBFS) copyFiles(ctx context.Context, targets map[Navigator][]*File, destination *File, fc inventory.FileClient) (map[int]*ent.File, inventory.StorageDiff, *fs.IndexDiff, error) {
 	if f.user.Edges.Group == nil {
-		return nil, nil, fmt.Errorf("user group not loaded")
+		return nil, nil, nil, fmt.Errorf("user group not loaded")
 	}
 	limit := max(f.user.Edges.Group.Settings.MaxWalkedFiles, 1)
 	capacity, err := f.Capacity(ctx, destination.Owner())
 	if err != nil {
-		return nil, nil, fmt.Errorf("copy files: failed to destination owner capacity: %w", err)
+		return nil, nil, nil, fmt.Errorf("copy files: failed to destination owner capacity: %w", err)
 	}
 
 	dstAncestors := lo.Map(destination.AncestorsChain(), func(item *File, index int) *ent.File {
@@ -830,6 +875,7 @@ func (f *DBFS) copyFiles(ctx context.Context, targets map[Navigator][]*File, des
 	// newTargetsMap is the map of between new target files in first layer, and its src file ID.
 	newTargetsMap := make(map[int]*ent.File)
 	storageDiff := make(inventory.StorageDiff)
+	indexToCopy := make([]fs.IndexDiffCopyDetails, 0)
 	var diff inventory.StorageDiff
 	for n, files := range targets {
 		initialDstMap := make(map[int][]*ent.File)
@@ -841,7 +887,7 @@ func (f *DBFS) copyFiles(ctx context.Context, targets map[Navigator][]*File, des
 		// Let navigator use tx
 		reset, err := n.FollowTx(ctx)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		defer reset()
@@ -858,9 +904,13 @@ func (f *DBFS) copyFiles(ctx context.Context, targets map[Navigator][]*File, des
 			}
 
 			limit -= len(targets)
-			initialDstMap, diff, err = fc.Copy(ctx, lo.Map(targets, func(item *File, index int) *ent.File {
-				return item.Model
-			}), initialDstMap)
+			initialDstMap, diff, err = fc.Copy(ctx, &inventory.CopyParameter{
+				Files: lo.Map(targets, func(item *File, index int) *ent.File {
+					return item.Model
+				}),
+				ExcludedMetadataKeys: []string{FullTextIndexKey},
+				DstMap:               initialDstMap,
+			})
 			if err != nil {
 				if ent.IsConstraintError(err) {
 					return fs.ErrFileExisted.WithError(err)
@@ -870,10 +920,22 @@ func (f *DBFS) copyFiles(ctx context.Context, targets map[Navigator][]*File, des
 			}
 
 			storageDiff.Merge(diff)
-
 			if firstLayer {
 				for k, v := range initialDstMap {
 					newTargetsMap[k] = v[0]
+				}
+			}
+
+			for _, file := range targets {
+				if _, ok := file.Metadata()[FullTextIndexKey]; ok {
+					copiedFile := newTargetsMap[file.ID()]
+					indexToCopy = append(indexToCopy, fs.IndexDiffCopyDetails{
+						OriginalFileID: file.ID(),
+						FileID:         copiedFile.ID,
+						Uri:            *destination.Uri(false).Join(file.Name()),
+						EntityID:       copiedFile.PrimaryEntity,
+						OwnerID:        destination.OwnerID(),
+					})
 				}
 			}
 
@@ -882,14 +944,21 @@ func (f *DBFS) copyFiles(ctx context.Context, targets map[Navigator][]*File, des
 
 			return nil
 		}); err != nil {
-			return nil, nil, fmt.Errorf("failed to walk files: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to walk files: %w", err)
 		}
 	}
 
-	return newTargetsMap, storageDiff, nil
+	var indexDiff *fs.IndexDiff
+	if len(indexToCopy) > 0 {
+		indexDiff = &fs.IndexDiff{
+			IndexToCopy: indexToCopy,
+		}
+	}
+
+	return newTargetsMap, storageDiff, indexDiff, nil
 }
 
-func (f *DBFS) moveFiles(ctx context.Context, targets []*File, destination *File, fc inventory.FileClient, n Navigator) (inventory.StorageDiff, error) {
+func (f *DBFS) moveFiles(ctx context.Context, targets []*File, destination *File, fc inventory.FileClient, n Navigator) (inventory.StorageDiff, *fs.IndexDiff, error) {
 	models := lo.Map(targets, func(value *File, key int) *ent.File {
 		return value.Model
 	})
@@ -897,10 +966,10 @@ func (f *DBFS) moveFiles(ctx context.Context, targets []*File, destination *File
 	// Change targets' parent
 	if err := fc.SetParent(ctx, models, destination.Model); err != nil {
 		if ent.IsConstraintError(err) {
-			return nil, fs.ErrFileExisted.WithError(err)
+			return nil, nil, fs.ErrFileExisted.WithError(err)
 		}
 
-		return nil, serializer.NewError(serializer.CodeDBError, "Failed to move file", err)
+		return nil, nil, serializer.NewError(serializer.CodeDBError, "Failed to move file", err)
 	}
 
 	var (
@@ -916,17 +985,17 @@ func (f *DBFS) moveFiles(ctx context.Context, targets []*File, destination *File
 		// renaming it to its original name
 		if _, err := fc.Rename(ctx, file.Model, file.DisplayName()); err != nil {
 			if ent.IsConstraintError(err) {
-				return nil, fs.ErrFileExisted.WithError(err)
+				return nil, nil, fs.ErrFileExisted.WithError(err)
 			}
 
-			return storageDiff, serializer.NewError(serializer.CodeDBError, "Failed to rename file from trash bin to its original name", err)
+			return storageDiff, nil, serializer.NewError(serializer.CodeDBError, "Failed to rename file from trash bin to its original name", err)
 		}
 
 		// Remove trash bin metadata
 		if err := fc.RemoveMetadata(ctx, file.Model, MetadataRestoreUri, MetadataExpectedCollectTime); err != nil {
-			return storageDiff, serializer.NewError(serializer.CodeDBError, "Failed to remove trash related metadata", err)
+			return storageDiff, nil, serializer.NewError(serializer.CodeDBError, "Failed to remove trash related metadata", err)
 		}
 	}
 
-	return storageDiff, nil
+	return storageDiff, nil, nil
 }

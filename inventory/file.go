@@ -139,6 +139,12 @@ type (
 		ParentFiles              []int
 		PrimaryEntityParentFiles []int
 	}
+
+	CopyParameter struct {
+		Files                []*ent.File
+		DstMap               map[int][]*ent.File
+		ExcludedMetadataKeys []string
+	}
 )
 
 type FileClient interface {
@@ -187,7 +193,7 @@ type FileClient interface {
 	// UpsertMetadata update or insert metadata
 	UpsertMetadata(ctx context.Context, file *ent.File, data map[string]string, privateMask map[string]bool) error
 	// Copy copies a layer of file to its corresponding destination folder. dstMap is a map from src parent ID to dst parent Files.
-	Copy(ctx context.Context, files []*ent.File, dstMap map[int][]*ent.File) (map[int][]*ent.File, StorageDiff, error)
+	Copy(ctx context.Context, args *CopyParameter) (map[int][]*ent.File, StorageDiff, error)
 	// Delete deletes a group of files (and related models) with given entity recycle option
 	Delete(ctx context.Context, files []*ent.File, options *types.EntityProps) ([]*ent.Entity, StorageDiff, error)
 	// StaleEntities returns stale entities of a given file. If ID is not provided, all entities
@@ -203,6 +209,11 @@ type FileClient interface {
 	UnlinkEntity(ctx context.Context, entity *ent.Entity, file *ent.File, owner *ent.User) (StorageDiff, error)
 	// CreateDirectLink creates a direct link for a file
 	CreateDirectLink(ctx context.Context, fileID int, name string, speed int, reuse bool) (*ent.DirectLink, error)
+	// CountIndexableFiles counts files suitable for FTS indexing (non-empty name, has parent, is file type).
+	CountIndexableFiles(ctx context.Context) (int, error)
+	// ListIndexableFiles lists files suitable for FTS indexing, returning up to limit files
+	// with ID strictly greater than afterID. Use afterID=0 to start from the beginning.
+	ListIndexableFiles(ctx context.Context, afterID, limit int) ([]*ent.File, error)
 	// CountByTimeRange counts files created in a given time range
 	CountByTimeRange(ctx context.Context, start, end *time.Time) (int, error)
 	// CountEntityByTimeRange counts entities created in a given time range
@@ -223,6 +234,8 @@ type FileClient interface {
 	UpdateProps(ctx context.Context, file *ent.File, props *types.FileProps) (*ent.File, error)
 	// UpdateModifiedAt updates modified at of a file
 	UpdateModifiedAt(ctx context.Context, file *ent.File, modifiedAt time.Time) error
+	// DeleteAllMetadataByName deletes all metadata by a given name
+	DeleteAllMetadataByName(ctx context.Context, name string) error
 }
 
 func NewFileClient(client *ent.Client, dbType conf.DBType, hasher hashid.Encoder) FileClient {
@@ -306,6 +319,36 @@ func (f *fileClient) CountByTimeRange(ctx context.Context, start, end *time.Time
 	}
 
 	return f.client.File.Query().Where(file.CreatedAtGTE(*start), file.CreatedAtLT(*end)).Count(ctx)
+}
+
+func (f *fileClient) DeleteAllMetadataByName(ctx context.Context, name string) error {
+	_, err := f.client.Metadata.Delete().Where(metadata.Name(name)).Exec(schema.SkipSoftDelete(ctx))
+	if err != nil {
+		return fmt.Errorf("failed to delete metadata: %w", err)
+	}
+
+	return nil
+}
+
+func (f *fileClient) CountIndexableFiles(ctx context.Context) (int, error) {
+	return f.indexableFilesQuery().Count(ctx)
+}
+
+func (f *fileClient) ListIndexableFiles(ctx context.Context, afterID, limit int) ([]*ent.File, error) {
+	q := f.indexableFilesQuery()
+	if afterID > 0 {
+		q = q.Where(file.IDGT(afterID))
+	}
+	return q.Limit(limit).All(ctx)
+}
+
+func (f *fileClient) indexableFilesQuery() *ent.FileQuery {
+	return f.client.File.Query().Where(
+		file.Type(int(types.FileTypeFile)),
+		file.NameNEQ(""),
+		file.SizeGT(0),
+		file.FileChildrenNotNil(),
+	).Order(file.ByID())
 }
 
 func (f *fileClient) CountEntityByTimeRange(ctx context.Context, start, end *time.Time) (int, error) {
@@ -562,7 +605,9 @@ func (f *fileClient) Delete(ctx context.Context, files []*ent.File, options *typ
 	return toBeRecycled, storageReduced, nil
 }
 
-func (f *fileClient) Copy(ctx context.Context, files []*ent.File, dstMap map[int][]*ent.File) (map[int][]*ent.File, StorageDiff, error) {
+func (f *fileClient) Copy(ctx context.Context, args *CopyParameter) (map[int][]*ent.File, StorageDiff, error) {
+	files := args.Files
+	dstMap := args.DstMap
 	pageSize := capPageSize(f.maxSQlParam, intsets.MaxInt, 10)
 	// 1. Copy files and metadata
 	copyFileStm := lo.Map(files, func(file *ent.File, index int) *ent.FileCreate {
@@ -603,12 +648,15 @@ func (f *fileClient) Copy(ctx context.Context, files []*ent.File, dstMap map[int
 			return nil, nil, fmt.Errorf("failed to get metadata of file: %w", err)
 		}
 
-		metadataStm = append(metadataStm, lo.Map(fileMetadata, func(metadata *ent.Metadata, index int) *ent.MetadataCreate {
+		metadataStm = append(metadataStm, lo.FilterMap(fileMetadata, func(metadata *ent.Metadata, index int) (*ent.MetadataCreate, bool) {
+			if lo.Contains(args.ExcludedMetadataKeys, metadata.Name) {
+				return nil, false
+			}
 			return f.client.Metadata.Create().
 				SetName(metadata.Name).
 				SetValue(metadata.Value).
 				SetFile(newFile).
-				SetIsPublic(metadata.IsPublic)
+				SetIsPublic(metadata.IsPublic), true
 		})...)
 
 		fileEntities, err := files[index].Edges.EntitiesOrErr()

@@ -755,6 +755,13 @@ func initMasterRouter(dep dependency.Dep) *gin.Engine {
 				controllers.FromJSON[explorer.ImportWorkflowService](explorer.CreateImportParamCtx{}),
 				controllers.ImportFiles,
 			)
+			// Create task to import files
+			wf.POST("rebuildFtsIndex",
+				middleware.IsAdmin(),
+				middleware.RequiredScopes(types.ScopeWorkflowWrite, types.ScopeAdminWrite),
+				controllers.FromJSON[explorer.RebuildFTSIndexWorkflowService](explorer.CreateRebuildFTSIndexParamCtx{}),
+				controllers.RebuildFTSIndex,
+			)
 
 			// 取得文件外链
 			source := file.Group("source")
@@ -784,6 +791,16 @@ func initMasterRouter(dep dependency.Dep) *gin.Engine {
 				}),
 				controllers.FromQuery[explorer.ExplorerEventService](explorer.ExplorerEventParamCtx{}),
 				controllers.HandleExplorerEventsPush,
+			)
+
+			// Full text search
+			file.GET("search",
+				middleware.LoginRequired(),
+				middleware.IsFunctionEnabled(func(c *gin.Context) bool {
+					return dep.SettingProvider().FTSEnabled(c)
+				}),
+				controllers.FromQuery[explorer.FulltextSearchService](explorer.FulltextSearchParamCtx{}),
+				controllers.FulltextSearch,
 			)
 		}
 

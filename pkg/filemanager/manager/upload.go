@@ -231,11 +231,12 @@ func (m *manager) CancelUploadSession(ctx context.Context, path *fs.URI, session
 
 	var (
 		staleEntities []fs.Entity
+		indexDiff     *fs.IndexDiff
 		err           error
 	)
 
 	if !m.stateless {
-		staleEntities, err = m.fs.CancelUploadSession(ctx, path, sessionID, session)
+		staleEntities, indexDiff, err = m.fs.CancelUploadSession(ctx, path, sessionID, session)
 		if err != nil {
 			return err
 		}
@@ -277,6 +278,11 @@ func (m *manager) CancelUploadSession(ctx context.Context, path *fs.URI, session
 		}
 	}
 
+	// Process index diff
+	if indexDiff != nil {
+		m.processIndexDiff(ctx, indexDiff)
+	}
+
 	return nil
 }
 
@@ -291,13 +297,16 @@ func (m *manager) CompleteUpload(ctx context.Context, session *fs.UploadSession)
 	}
 
 	var (
-		file fs.File
+		file    fs.File
+		ownerId int
 	)
 	if m.fs != nil {
 		file, err = m.fs.CompleteUpload(ctx, session)
 		if err != nil {
 			return nil, fmt.Errorf("failed to complete upload: %w", err)
 		}
+
+		ownerId = file.OwnerID()
 	}
 
 	if session.SentinelTaskID > 0 {
@@ -308,7 +317,7 @@ func (m *manager) CompleteUpload(ctx context.Context, session *fs.UploadSession)
 		}
 	}
 
-	m.onNewEntityUploaded(ctx, session, d)
+	m.onNewEntityUploaded(ctx, session, d, ownerId)
 	// Remove upload session
 	_ = m.kv.Delete(UploadSessionCachePrefix, session.Props.UploadSessionID)
 	return file, nil
@@ -371,7 +380,7 @@ func (m *manager) OnUploadFailed(ctx context.Context, session *fs.UploadSession)
 				m.l.Warning("OnUploadFailed hook failed to delete file: %s", err)
 			}
 		} else if !session.Importing {
-			if err := m.fs.VersionControl(ctx, session.Props.Uri, session.EntityID, true); err != nil {
+			if _, err := m.fs.VersionControl(ctx, session.Props.Uri, session.EntityID, true); err != nil {
 				m.l.Warning("OnUploadFailed hook failed to version control: %s", err)
 			}
 		}
@@ -426,10 +435,12 @@ func (m *manager) updateStateless(ctx context.Context, req *fs.UploadRequest, o 
 	return nil, nil
 }
 
-func (m *manager) onNewEntityUploaded(ctx context.Context, session *fs.UploadSession, d driver.Handler) {
+func (m *manager) onNewEntityUploaded(ctx context.Context, session *fs.UploadSession, d driver.Handler, owner int) {
 	if !m.stateless {
 		// Submit media meta task for new entity
 		m.mediaMetaForNewEntity(ctx, session, d)
+		// Submit full text index task for new entity
+		m.fullTextIndexForNewEntity(ctx, session, owner)
 	}
 }
 

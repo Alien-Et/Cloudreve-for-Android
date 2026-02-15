@@ -108,6 +108,10 @@ docker_manifests:
     image_templates:
       - "cloudreve/cloudreve:{{ .Tag }}-amd64"
       - "cloudreve/cloudreve:{{ .Tag }}-arm64"
+  - name_template: "cloudreve/cloudreve:v4"
+    image_templates:
+      - "cloudreve/cloudreve:{{ .Tag }}-amd64"
+      - "cloudreve/cloudreve:{{ .Tag }}-arm64"
   - name_template: "cloudreve/cloudreve:{{ .Tag }}"
     image_templates:
       - "cloudreve/cloudreve:{{ .Tag }}-amd64"

@@ -76,11 +76,11 @@ type (
 		// List lists files under give path.
 		List(ctx context.Context, path *URI, opts ...Option) (File, *ListFileResult, error)
 		// Rename renames a file.
-		Rename(ctx context.Context, path *URI, newName string) (File, error)
+		Rename(ctx context.Context, path *URI, newName string) (File, *IndexDiff, error)
 		// Move moves files to dst.
-		MoveOrCopy(ctx context.Context, path []*URI, dst *URI, isCopy bool) error
+		MoveOrCopy(ctx context.Context, path []*URI, dst *URI, isCopy bool) (*IndexDiff, error)
 		// Delete performs hard-delete for given paths, return newly generated stale entities in this delete operation.
-		Delete(ctx context.Context, path []*URI, opts ...Option) ([]Entity, error)
+		Delete(ctx context.Context, path []*URI, opts ...Option) ([]Entity, *IndexDiff, error)
 		// GetEntitiesFromFileID returns all entities of a given file.
 		GetEntity(ctx context.Context, entityID int) (Entity, error)
 		// UpsertMetadata update or insert metadata of a file.
@@ -92,7 +92,7 @@ type (
 		// VersionControl performs version control on given file.
 		//  - `delete` is false: set version as current version;
 		//  - `delete` is true: delete version.
-		VersionControl(ctx context.Context, path *URI, versionId int, delete bool) error
+		VersionControl(ctx context.Context, path *URI, versionId int, delete bool) (*IndexDiff, error)
 		// GetFileFromDirectLink gets a file from a direct link.
 		GetFileFromDirectLink(ctx context.Context, dl *ent.DirectLink) (File, error)
 		// TraverseFile traverses a file to its root file, return the file with linked root.
@@ -108,7 +108,7 @@ type (
 		// CompleteUpload completes an upload session.
 		CompleteUpload(ctx context.Context, session *UploadSession) (File, error)
 		// CancelUploadSession cancels an upload session. Delete the placeholder file if no other entity is created.
-		CancelUploadSession(ctx context.Context, path *URI, sessionID string, session *UploadSession) ([]Entity, error)
+		CancelUploadSession(ctx context.Context, path *URI, sessionID string, session *UploadSession) ([]Entity, *IndexDiff, error)
 		// PreValidateUpload pre-validates an upload request.
 		PreValidateUpload(ctx context.Context, dst *URI, files ...PreValidateFile) error
 	}
@@ -806,5 +806,77 @@ func NewEmptyEntity(u *ent.User) Entity {
 				User: u,
 			},
 		},
+	}
+}
+
+type (
+	// IndexDiff is the difference between the old and new full-text index after file operation.
+	IndexDiff struct {
+		IndexToCopy        []IndexDiffCopyDetails
+		IndexToChangeOwner []IndexDiffOwnerChangeDetails
+		IndexToRename      []IndexDiffRenameDetails
+		IndexToDelete      []int
+		IndexToUpdate      []IndexDiffUpdateDetails
+	}
+	IndexDiffUpdateDetails struct {
+		Uri      URI
+		FileID   int
+		OwnerID  int
+		EntityID int
+	}
+	IndexDiffCopyDetails struct {
+		Uri            URI
+		OriginalFileID int
+		FileID         int
+		OwnerID        int
+		EntityID       int
+	}
+	IndexDiffOwnerChangeDetails struct {
+		Uri             URI
+		FileID          int
+		EntityID        int
+		OriginalOwnerID int
+		NewOwnerID      int
+	}
+	IndexDiffRenameDetails struct {
+		Uri      URI
+		FileID   int
+		EntityID int
+	}
+)
+
+func (i *IndexDiff) Merge(d *IndexDiff) {
+	if i.IndexToCopy == nil {
+		i.IndexToCopy = make([]IndexDiffCopyDetails, 0)
+	}
+	if i.IndexToChangeOwner == nil {
+		i.IndexToChangeOwner = make([]IndexDiffOwnerChangeDetails, 0)
+	}
+	if i.IndexToDelete == nil {
+		i.IndexToDelete = make([]int, 0)
+	}
+	if i.IndexToRename == nil {
+		i.IndexToRename = make([]IndexDiffRenameDetails, 0)
+	}
+	if i.IndexToUpdate == nil {
+		i.IndexToUpdate = make([]IndexDiffUpdateDetails, 0)
+	}
+	if d == nil {
+		return
+	}
+	if len(d.IndexToCopy) > 0 {
+		i.IndexToCopy = append(i.IndexToCopy, d.IndexToCopy...)
+	}
+	if len(d.IndexToChangeOwner) > 0 {
+		i.IndexToChangeOwner = append(i.IndexToChangeOwner, d.IndexToChangeOwner...)
+	}
+	if len(d.IndexToDelete) > 0 {
+		i.IndexToDelete = append(i.IndexToDelete, d.IndexToDelete...)
+	}
+	if len(d.IndexToRename) > 0 {
+		i.IndexToRename = append(i.IndexToRename, d.IndexToRename...)
+	}
+	if len(d.IndexToUpdate) > 0 {
+		i.IndexToUpdate = append(i.IndexToUpdate, d.IndexToUpdate...)
 	}
 }

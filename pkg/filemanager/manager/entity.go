@@ -346,11 +346,15 @@ func (m *manager) GetEntitySource(ctx context.Context, entityID int, opts ...fs.
 }
 
 func (l *manager) SetCurrentVersion(ctx context.Context, path *fs.URI, version int) error {
-	return l.fs.VersionControl(ctx, path, version, false)
+	indexDiff, err := l.fs.VersionControl(ctx, path, version, false)
+
+	l.processIndexDiff(ctx, indexDiff)
+	return err
 }
 
 func (l *manager) DeleteVersion(ctx context.Context, path *fs.URI, version int) error {
-	return l.fs.VersionControl(ctx, path, version, true)
+	_, err := l.fs.VersionControl(ctx, path, version, true)
+	return err
 }
 
 func (l *manager) ListPhysical(ctx context.Context, path string, policyID int, recursive bool, progress driver.ListProgressFunc) ([]fs.PhysicalObject, error) {
@@ -392,7 +396,7 @@ func (l *manager) ImportPhysical(ctx context.Context, dst *fs.URI, policyId int,
 			return err
 		}
 
-		l.onNewEntityUploaded(ctx, uploadSession, d)
+		l.onNewEntityUploaded(ctx, uploadSession, d, l.user.ID)
 	}
 
 	return nil

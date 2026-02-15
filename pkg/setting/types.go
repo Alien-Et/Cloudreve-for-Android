@@ -225,6 +225,34 @@ type CustomHTML struct {
 	SidebarBottom  string `json:"sidebar_bottom,omitempty"`
 }
 
+type FTSIndexType string
+
+const (
+	FTSIndexTypeNone        = FTSIndexType("")
+	FTSIndexTypeMeilisearch = FTSIndexType("meilisearch")
+)
+
+type FTSExtractorType string
+
+const (
+	FTSExtractorTypeNone = FTSExtractorType("")
+	FTSExtractorTypeTika = FTSExtractorType("tika")
+)
+
+type FTSIndexMeilisearchSetting struct {
+	Endpoint         string
+	APIKey           string
+	PageSize         int
+	EmbeddingEnbaled bool
+	EmbeddingSetting string
+}
+
+type FTSTikaExtractorSetting struct {
+	Endpoint    string
+	Exts        []string
+	MaxFileSize int64
+}
+
 type MasterEncryptKeyVaultType string
 
 const (
