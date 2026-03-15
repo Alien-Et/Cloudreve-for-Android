@@ -684,6 +684,7 @@ var DefaultSettings = map[string]string{
 	"fts_tika_exts":                              "pdf,doc,docx,xls,xlsx,ppt,pptx,odt,ods,odp,rtf,txt,md,html,htm,epub,csv",
 	"fts_tika_max_file_size":                     "26214400",
 	"fts_chunk_size":                             "2000",
+	"viewer_default_apps":                        "{}",
 }
 
 var RedactedSettings = map[string]struct{}{

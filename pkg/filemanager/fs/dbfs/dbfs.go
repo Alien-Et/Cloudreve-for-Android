@@ -494,7 +494,7 @@ func (f *DBFS) Get(ctx context.Context, path *fs.URI, opts ...fs.Option) (fs.Fil
 
 			// cache the summary
 			newSummary.CalculatedAt = time.Now()
-			f.cache.Set(fmt.Sprintf("%s%d", folderSummaryCachePrefix, target.ID()), newSummary, f.settingClient.FolderPropsCacheTTL(ctx))
+			f.cache.Set(fmt.Sprintf("%s%d", folderSummaryCachePrefix, target.ID()), *newSummary, f.settingClient.FolderPropsCacheTTL(ctx))
 			target.FileFolderSummary = newSummary
 		}
 	}

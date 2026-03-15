@@ -147,5 +147,5 @@ func (n *sharedWithMeNavigator) GetView(ctx context.Context, file *File) *types.
 	if view, ok := n.user.Settings.FsViewMap[string(constants.FileSystemSharedWithMe)]; ok {
 		return &view
 	}
-	return defaultView
+	return getDefaultView()
 }

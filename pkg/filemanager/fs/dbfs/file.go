@@ -30,12 +30,15 @@ var (
 			}
 		},
 	}
-	defaultView = &types.ExplorerView{
+)
+
+func getDefaultView() *types.ExplorerView {
+	return &types.ExplorerView{
 		PageSize:  defaultPageSize,
 		View:      "grid",
 		Thumbnail: true,
 	}
-)
+}
 
 type (
 	File struct {
@@ -213,7 +216,7 @@ func (f *File) View() *types.ExplorerView {
 		current = current.Parent
 	}
 
-	return defaultView
+	return getDefaultView()
 }
 
 // UserRoot return the root file from user's view.

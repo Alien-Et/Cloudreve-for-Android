@@ -43,18 +43,19 @@ type SiteConfig struct {
 	PrivacyPolicyUrl string              `json:"privacy_policy_url,omitempty"`
 
 	// Explorer section
-	Icons                string                    `json:"icons,omitempty"`
-	EmojiPreset          string                    `json:"emoji_preset,omitempty"`
-	MapProvider          setting.MapProvider       `json:"map_provider,omitempty"`
-	GoogleMapTileType    setting.MapGoogleTileType `json:"google_map_tile_type,omitempty"`
-	MapboxAK             string                    `json:"mapbox_ak,omitempty"`
-	FileViewers          []types.ViewerGroup       `json:"file_viewers,omitempty"`
-	MaxBatchSize         int                       `json:"max_batch_size,omitempty"`
-	ThumbnailWidth       int                       `json:"thumbnail_width,omitempty"`
-	ThumbnailHeight      int                       `json:"thumbnail_height,omitempty"`
-	CustomProps          []types.CustomProps       `json:"custom_props,omitempty"`
-	ShowEncryptionStatus bool                      `json:"show_encryption_status,omitempty"`
-	FullTextSearch       bool                      `json:"full_text_search,omitempty"`
+	Icons                string                     `json:"icons,omitempty"`
+	EmojiPreset          string                     `json:"emoji_preset,omitempty"`
+	MapProvider          setting.MapProvider        `json:"map_provider,omitempty"`
+	GoogleMapTileType    setting.MapGoogleTileType  `json:"google_map_tile_type,omitempty"`
+	MapboxAK             string                     `json:"mapbox_ak,omitempty"`
+	FileViewers          []types.ViewerGroup        `json:"file_viewers,omitempty"`
+	DefaultViewerMapping types.DefaultViewerMapping `json:"default_viewer_mapping,omitempty"`
+	MaxBatchSize         int                        `json:"max_batch_size,omitempty"`
+	ThumbnailWidth       int                        `json:"thumbnail_width,omitempty"`
+	ThumbnailHeight      int                        `json:"thumbnail_height,omitempty"`
+	CustomProps          []types.CustomProps        `json:"custom_props,omitempty"`
+	ShowEncryptionStatus bool                       `json:"show_encryption_status,omitempty"`
+	FullTextSearch       bool                       `json:"full_text_search,omitempty"`
 
 	// Thumbnail section
 	ThumbExts []string `json:"thumb_exts,omitempty"`
@@ -113,6 +114,7 @@ func (s *GetSettingService) GetSiteConfig(c *gin.Context) (*SiteConfig, error) {
 		return &SiteConfig{
 			MaxBatchSize:         maxBatchSize,
 			FileViewers:          fileViewers,
+			DefaultViewerMapping: settings.DefaultViewerMapping(c),
 			Icons:                explorerSettings.Icons,
 			MapProvider:          mapSettings.Provider,
 			GoogleMapTileType:    mapSettings.GoogleTileType,

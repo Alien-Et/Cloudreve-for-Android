@@ -8,6 +8,8 @@
 *.bin
 /release/
 application/statics/assets.zip
+master_v4
+slave_v4
 
 # Test binary, build with `go test -c`
 *.test
@@ -34,3 +36,4 @@ data/
 tmp/
 .devcontainer/
 cloudreve
+.DS_Store

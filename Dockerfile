@@ -22,7 +22,7 @@ COPY cloudreve ./cloudreve
 RUN chmod +x ./cloudreve \
     && chmod +x ./entrypoint.sh
 
-EXPOSE 5212 443
+EXPOSE 5212 443 6888 6888/udp
 
 VOLUME ["/cloudreve/data"]
 

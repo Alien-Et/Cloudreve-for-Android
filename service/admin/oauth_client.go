@@ -4,6 +4,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/application/dependency"
 	"github.com/cloudreve/Cloudreve/v4/ent"
 	"github.com/cloudreve/Cloudreve/v4/inventory"
+	"github.com/cloudreve/Cloudreve/v4/inventory/types"
 	"github.com/cloudreve/Cloudreve/v4/pkg/serializer"
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
@@ -23,8 +24,21 @@ type (
 )
 
 type (
+	// UpsertOAuthClientRequest expands ent.OAuthClient fields to avoid json:"-"
+	// redaction on Secret field, which prevents it from being bound from JSON input.
+	UpsertOAuthClientRequest struct {
+		ID           int                     `json:"id,omitempty"`
+		GUID         string                  `json:"guid,omitempty"`
+		Secret       string                  `json:"secret,omitempty"`
+		Name         string                  `json:"name,omitempty"`
+		HomepageURL  string                  `json:"homepage_url,omitempty"`
+		RedirectUris []string                `json:"redirect_uris,omitempty"`
+		Scopes       []string                `json:"scopes,omitempty"`
+		Props        *types.OAuthClientProps `json:"props,omitempty"`
+		IsEnabled    bool                    `json:"is_enabled"`
+	}
 	UpsertOAuthClientService struct {
-		Client *ent.OAuthClient `json:"client" binding:"required"`
+		Client *UpsertOAuthClientRequest `json:"client" binding:"required"`
 	}
 	UpsertOAuthClientParamCtx struct{}
 )
@@ -99,6 +113,20 @@ func (s *SingleOAuthClientService) Get(c *gin.Context) (*GetOAuthClientResponse,
 	return res, nil
 }
 
+func (r *UpsertOAuthClientRequest) toEnt() *ent.OAuthClient {
+	return &ent.OAuthClient{
+		ID:           r.ID,
+		GUID:         r.GUID,
+		Secret:       r.Secret,
+		Name:         r.Name,
+		HomepageURL:  r.HomepageURL,
+		RedirectUris: r.RedirectUris,
+		Scopes:       r.Scopes,
+		Props:        r.Props,
+		IsEnabled:    r.IsEnabled,
+	}
+}
+
 func (s *UpsertOAuthClientService) Create(c *gin.Context) (*GetOAuthClientResponse, error) {
 	dep := dependency.FromContext(c)
 	oauthClient := dep.OAuthClientClient()
@@ -107,7 +135,7 @@ func (s *UpsertOAuthClientService) Create(c *gin.Context) (*GetOAuthClientRespon
 		return nil, serializer.NewError(serializer.CodeParamErr, "ID must be 0 for creating new OAuth client", nil)
 	}
 
-	client, err := oauthClient.Create(c, s.Client)
+	client, err := oauthClient.Create(c, s.Client.toEnt())
 	if err != nil {
 		return nil, serializer.NewError(serializer.CodeDBError, "Failed to create OAuth client", err)
 	}
@@ -135,7 +163,7 @@ func (s *UpsertOAuthClientService) Update(c *gin.Context) (*GetOAuthClientRespon
 		s.Client.GUID = existing.GUID
 	}
 
-	_, err = oauthClient.Update(c, s.Client)
+	_, err = oauthClient.Update(c, s.Client.toEnt())
 	if err != nil {
 		return nil, serializer.NewError(serializer.CodeDBError, "Failed to update OAuth client", err)
 	}

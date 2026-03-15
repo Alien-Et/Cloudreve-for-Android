@@ -330,6 +330,8 @@ type (
 		Viewers []Viewer `json:"viewers"`
 	}
 
+	DefaultViewerMapping map[string]string
+
 	NewFileTemplate struct {
 		Ext         string `json:"ext"`
 		DisplayName string `json:"display_name"`

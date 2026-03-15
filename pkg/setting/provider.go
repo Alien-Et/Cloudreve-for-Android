@@ -234,6 +234,8 @@ type (
 		FTSTikaExtractor(ctx context.Context) *FTSTikaExtractorSetting
 		// FTSChunkSize returns the maximum chunk size in bytes for full-text search indexing.
 		FTSChunkSize(ctx context.Context) int
+		// DefaultViewerMapping returns the default viewer mapping.
+		DefaultViewerMapping(ctx context.Context) types.DefaultViewerMapping
 	}
 	UseFirstSiteUrlCtxKey = struct{}
 )
@@ -323,6 +325,15 @@ func (s *settingProvider) Avatar(ctx context.Context) *Avatar {
 		Gravatar: s.getString(ctx, "gravatar_server", ""),
 		Path:     s.getString(ctx, "avatar_path", "avatar"),
 	}
+}
+
+func (s *settingProvider) DefaultViewerMapping(ctx context.Context) types.DefaultViewerMapping {
+	raw := s.getString(ctx, "viewer_default_apps", "{}")
+	var mapping types.DefaultViewerMapping
+	if err := json.Unmarshal([]byte(raw), &mapping); err != nil {
+		return types.DefaultViewerMapping{}
+	}
+	return mapping
 }
 
 func (s *settingProvider) FileViewers(ctx context.Context) []types.ViewerGroup {
