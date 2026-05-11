@@ -126,6 +126,10 @@ func (f *File) SizeUsed() int64 {
 	})
 }
 
+func (f *File) InTrashBin() bool {
+	return f.Root().Name() != inventory.RootFolderName
+}
+
 func (f *File) UpdatedAt() time.Time {
 	return f.Model.UpdatedAt
 }
@@ -368,6 +372,10 @@ func (f *File) Recycle() {
 	f.Parent = nil
 	f.OwnerModel = nil
 	f.IsUserRoot = false
+	f.CapabilitiesBs = nil
+	f.FileExtendedInfo = nil
+	f.FileFolderSummary = nil
+	f.disableView = false
 	f.mu = nil
 
 	filePool.Put(f)

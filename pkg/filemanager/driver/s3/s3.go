@@ -422,6 +422,10 @@ func (handler *Driver) Meta(ctx context.Context, path string) (*MetaData, error)
 		return nil, err
 	}
 
+	if res == nil || res.ContentLength == nil {
+		return nil, errors.New("invalid response from S3: missing ContentLength")
+	}
+
 	etag := ""
 	if res.ETag != nil {
 		etag = *res.ETag

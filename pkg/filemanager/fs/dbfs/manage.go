@@ -742,8 +742,14 @@ func (f *DBFS) TraverseFile(ctx context.Context, fileID int) (fs.File, error) {
 		rootUri = newTrashUri(root.Name())
 	}
 
+	navigator, err := f.getNavigator(ctx, rootUri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get navigator for root file: %w", err)
+	}
+
 	root.Path[pathIndexRoot] = rootUri
 	root.Path[pathIndexUser] = rootUri
+	file.CapabilitiesBs = navigator.Capabilities(false).Capability
 
 	return file, nil
 }

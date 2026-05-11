@@ -78,6 +78,7 @@ func (File) Indexes() []ent.Index {
 		index.Fields("file_children", "name").
 			Unique(),
 		index.Fields("file_children", "type", "updated_at"),
+		index.Fields("file_children", "type", "created_at"),
 		index.Fields("file_children", "type", "size"),
 	}
 }

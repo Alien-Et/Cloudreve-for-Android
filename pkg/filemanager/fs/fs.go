@@ -160,6 +160,7 @@ type (
 		Entities() []Entity
 		PrimaryEntity() Entity
 		PrimaryEntityID() int
+		InTrashBin() bool
 		Shared() bool
 		IsSymbolic() bool
 		PolicyID() (id int)

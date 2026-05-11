@@ -60,6 +60,10 @@ func (m *manager) SearchFullText(ctx context.Context, query string, offset int) 
 			return FullTextSearchResult{}, false
 		}
 
+		if file.InTrashBin() {
+			return FullTextSearchResult{}, false
+		}
+
 		return FullTextSearchResult{
 			File:    file,
 			Content: result.Text,

@@ -154,6 +154,11 @@ var (
 				Columns: []*schema.Column{FilesColumns[9], FilesColumns[3], FilesColumns[2]},
 			},
 			{
+				Name:    "file_file_children_type_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{FilesColumns[9], FilesColumns[3], FilesColumns[1]},
+			},
+			{
 				Name:    "file_file_children_type_size",
 				Unique:  false,
 				Columns: []*schema.Column{FilesColumns[9], FilesColumns[3], FilesColumns[5]},
