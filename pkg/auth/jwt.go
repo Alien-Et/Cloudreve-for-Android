@@ -257,7 +257,8 @@ func (t *tokenAuth) Issue(ctx context.Context, args *IssueTokenArgs) (*Token, er
 			NotBefore: jwt.NewNumericDate(issueDate),
 			ExpiresAt: jwt.NewNumericDate(accessTokenExpired),
 		},
-		Scopes: args.Scopes,
+		ClientID: args.ClientID,
+		Scopes:   args.Scopes,
 	}).SignedString(t.secret)
 	if err != nil {
 		return nil, fmt.Errorf("faield to sign access token: %w", err)

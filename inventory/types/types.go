@@ -121,6 +121,26 @@ type (
 		// 下载监控间隔
 		Interval       int  `json:"interval,omitempty"`
 		WaitForSeeding bool `json:"wait_for_seeding,omitempty"`
+		// URLValidation controls SSRF policy applied to user-supplied URLs
+		// fetched by this node's downloader. nil means the secure default
+		// (validation on, no extra allowlist) — existing nodes upgraded in
+		// place stay protected without admin action.
+		URLValidation *URLValidationSetting `json:"url_validation,omitempty"`
+	}
+
+	URLValidationSetting struct {
+		// Disabled turns the SSRF check off entirely on this node. Only set
+		// this when the downloader runs in a network segment that cannot
+		// reach any internal asset (e.g. dedicated egress namespace).
+		Disabled bool `json:"disabled,omitempty"`
+		// AllowedHosts is a list of hostnames or IP literals that bypass all
+		// checks. Exact, case-insensitive match against url.Hostname().
+		AllowedHosts []string `json:"allowed_hosts,omitempty"`
+		// AllowedCIDRs is a list of CIDR blocks (IPv4 or IPv6) whose IPs are
+		// treated as safe even if they would otherwise be rejected (private,
+		// link-local, etc.). Use this to whitelist a LAN range like
+		// "192.168.10.0/24" so a local NAS can be fetched.
+		AllowedCIDRs []string `json:"allowed_cidrs,omitempty"`
 	}
 
 	DownloaderProvider string

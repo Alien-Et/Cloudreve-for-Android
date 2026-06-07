@@ -25,6 +25,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/pkg/hashid"
 	"github.com/cloudreve/Cloudreve/v4/pkg/logging"
 	"github.com/cloudreve/Cloudreve/v4/pkg/queue"
+	"github.com/cloudreve/Cloudreve/v4/pkg/request"
 	"github.com/cloudreve/Cloudreve/v4/pkg/serializer"
 	"github.com/samber/lo"
 )
@@ -176,6 +177,20 @@ func (m *RemoteDownloadTask) createDownloadTask(ctx context.Context, dep depende
 
 	user := inventory.UserFromContext(ctx)
 	torrentUrl := m.state.SrcUri
+
+	// SSRF policy is owned by the node that actually performs the fetch.
+	// Validate the user-supplied URL (m.state.SrcUri) against the assigned
+	// node's URLValidation policy, with the operator-configured site URL
+	// host(s) always added to the allowlist. We don't validate SrcFileUri
+	// resolution because that's a Cloudreve-internal entity URL pointing at
+	// the user's own torrent file.
+	if m.state.SrcUri != "" {
+		opt := buildSSRFOptions(ctx, dep, m.node.Settings(ctx))
+		if err := request.ValidateExternalURL(ctx, m.state.SrcUri, opt); err != nil {
+			return task.StatusError, fmt.Errorf("url rejected: %s (%w)", err, queue.CriticalErr)
+		}
+	}
+
 	if m.state.SrcFileUri != "" {
 		// Target is a torrent file
 		uri, err := fs.NewUriFromString(m.state.SrcFileUri)
@@ -208,6 +223,24 @@ func (m *RemoteDownloadTask) createDownloadTask(ctx context.Context, dep depende
 	m.state.Handle = handle
 	m.state.Phase = RemoteDownloadTaskPhaseMonitor
 	return task.StatusSuspending, nil
+}
+
+// buildSSRFOptions composes the SSRF policy for a download: the assigned
+// node's URLValidation settings, plus the operator-configured site URL hosts
+// (always allowlisted so users can fetch files served by Cloudreve itself).
+func buildSSRFOptions(ctx context.Context, dep dependency.Dep, node *types.NodeSetting) request.SSRFOptions {
+	opt := request.SSRFOptions{}
+	if node != nil && node.URLValidation != nil {
+		opt.Disabled = node.URLValidation.Disabled
+		opt.AllowedHosts = append(opt.AllowedHosts, node.URLValidation.AllowedHosts...)
+		opt.AllowedCIDRs = append(opt.AllowedCIDRs, node.URLValidation.AllowedCIDRs...)
+	}
+	for _, u := range dep.SettingProvider().AllSiteURLs(ctx) {
+		if h := u.Hostname(); h != "" {
+			opt.AllowedHosts = append(opt.AllowedHosts, h)
+		}
+	}
+	return opt
 }
 
 func (m *RemoteDownloadTask) monitor(ctx context.Context, dep dependency.Dep) (task.Status, error) {

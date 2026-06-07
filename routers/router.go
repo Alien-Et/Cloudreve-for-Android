@@ -927,6 +927,7 @@ func initMasterRouter(dep dependency.Dep) *gin.Engine {
 						controllers.AdminFetchWopi,
 					)
 					tool.POST("thumbExecutable",
+						middleware.RequiredScopes(types.ScopeAdminWrite),
 						controllers.FromJSON[adminsvc.ThumbGeneratorTestService](adminsvc.ThumbGeneratorTestParamCtx{}),
 						controllers.AdminTestThumbGenerator)
 					tool.POST("mail",
