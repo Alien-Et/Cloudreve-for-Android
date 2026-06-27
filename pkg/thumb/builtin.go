@@ -1,6 +1,7 @@
 package thumb
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/manager/entitysource"
@@ -18,6 +19,12 @@ import (
 )
 
 const thumbTempFolder = "thumb"
+
+// maxDecodePixels caps the decoded pixel count to prevent pixel-bomb DoS:
+// stdlib decoders allocate bytesPerPixel*W*H from the header before reading
+// pixel data, so a tiny file with huge dimensions can otherwise OOM-kill the
+// process. 64 MP covers any realistic camera output.
+const maxDecodePixels = 64 * 1000 * 1000
 
 // BuiltinSupportedExts lists file extensions supported by the built-in
 // thumbnail generator. Extensions are lowercased and do not include the dot.
@@ -37,7 +44,18 @@ func NewThumbFromFile(file io.Reader, ext string) (*Thumb, error) {
 		return nil, fmt.Errorf("unknown image format: %w", ErrPassThrough)
 	}
 
-	var err error
+	var hdr bytes.Buffer
+	cfg, _, err := image.DecodeConfig(io.TeeReader(file, &hdr))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read image config: %w (%w)", err, ErrPassThrough)
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 ||
+		int64(cfg.Width)*int64(cfg.Height) > maxDecodePixels {
+		return nil, fmt.Errorf("image dimensions too large (%dx%d): %w",
+			cfg.Width, cfg.Height, ErrPassThrough)
+	}
+	file = io.MultiReader(&hdr, file)
+
 	var img image.Image
 	switch ext {
 	case "jpg", "jpeg":

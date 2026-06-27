@@ -685,6 +685,7 @@ var DefaultSettings = map[string]string{
 	"fts_tika_max_file_size":                     "26214400",
 	"fts_chunk_size":                             "2000",
 	"viewer_default_apps":                        "{}",
+	"expose_user_email":                          "1",
 }
 
 var RedactedSettings = map[string]struct{}{

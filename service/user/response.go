@@ -1,9 +1,11 @@
 package user
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/cloudreve/Cloudreve/v4/application/dependency"
 	"github.com/cloudreve/Cloudreve/v4/ent"
 	"github.com/cloudreve/Cloudreve/v4/ent/user"
 	"github.com/cloudreve/Cloudreve/v4/inventory/types"
@@ -222,7 +224,9 @@ const (
 )
 
 // BuildUserRedacted Serialize a user without sensitive information.
-func BuildUserRedacted(u *ent.User, level int, idEncoder hashid.Encoder) User {
+// The email is only exposed when the requester is a signed-in user (level >=
+// RedactLevelUser) and the `expose_user_email` setting is enabled.
+func BuildUserRedacted(ctx context.Context, u *ent.User, level int, idEncoder hashid.Encoder) User {
 	userRaw := BuildUser(u, idEncoder)
 
 	user := User{
@@ -237,7 +241,7 @@ func BuildUserRedacted(u *ent.User, level int, idEncoder hashid.Encoder) User {
 		user.Group = RedactedGroup(userRaw.Group)
 	}
 
-	if level == RedactLevelUser {
+	if level == RedactLevelUser && dependency.FromContext(ctx).SettingProvider().ExposeUserEmail(ctx) {
 		user.Email = userRaw.Email
 	}
 

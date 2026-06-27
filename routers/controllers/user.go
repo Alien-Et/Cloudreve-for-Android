@@ -208,7 +208,7 @@ func UserGet(c *gin.Context) {
 		redactLevel = user.RedactLevelAnonymous
 	}
 	c.JSON(200, serializer.Response{
-		Data: user.BuildUserRedacted(u, redactLevel, dependency.FromContext(c).HashIDEncoder()),
+		Data: user.BuildUserRedacted(c, u, redactLevel, dependency.FromContext(c).HashIDEncoder()),
 	})
 }
 
@@ -368,7 +368,7 @@ func UserSearch(c *gin.Context) {
 	hasher := dependency.FromContext(c).HashIDEncoder()
 	c.JSON(200, serializer.Response{
 		Data: lo.Map(u, func(item *ent.User, index int) user.User {
-			return user.BuildUserRedacted(item, user.RedactLevelUser, hasher)
+			return user.BuildUserRedacted(c, item, user.RedactLevelUser, hasher)
 		}),
 	})
 }

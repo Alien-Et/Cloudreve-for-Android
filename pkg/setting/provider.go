@@ -236,6 +236,9 @@ type (
 		FTSChunkSize(ctx context.Context) int
 		// DefaultViewerMapping returns the default viewer mapping.
 		DefaultViewerMapping(ctx context.Context) types.DefaultViewerMapping
+		// ExposeUserEmail returns true if user email should be exposed to other
+		// signed-in users in redacted responses.
+		ExposeUserEmail(ctx context.Context) bool
 	}
 	UseFirstSiteUrlCtxKey = struct{}
 )
@@ -858,6 +861,10 @@ func (s *settingProvider) AuthnEnabled(ctx context.Context) bool {
 
 func (s *settingProvider) RegisterEnabled(ctx context.Context) bool {
 	return s.getBoolean(ctx, "register_enabled", false)
+}
+
+func (s *settingProvider) ExposeUserEmail(ctx context.Context) bool {
+	return s.getBoolean(ctx, "expose_user_email", true)
 }
 
 func (s *settingProvider) SiteBasic(ctx context.Context) *SiteBasic {

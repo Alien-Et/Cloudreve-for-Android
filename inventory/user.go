@@ -402,6 +402,7 @@ func (c *userClient) SearchActive(ctx context.Context, limit int, keyword string
 		ctx,
 		c.client.User.Query().
 			Where(user.Or(user.EmailContainsFold(keyword), user.NickContainsFold(keyword))).
+			Where(user.StatusEQ(user.StatusActive)).
 			Limit(limit),
 	).All(ctx)
 }

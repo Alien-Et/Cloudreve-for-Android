@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/cloudreve/Cloudreve/v4/inventory/types"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/cloudreve/Cloudreve/v4/inventory/types"
 
 	"github.com/cloudreve/Cloudreve/v4/application/dependency"
 	"github.com/cloudreve/Cloudreve/v4/pkg/cluster/routes"
@@ -44,6 +45,7 @@ const (
 	LockTokenHeader       = WopiHeaderPrefix + "Lock"
 	ItemVersionHeader     = WopiHeaderPrefix + "ItemVersion"
 	SuggestedTargetHeader = WopiHeaderPrefix + "SuggestedTarget"
+	InvalidFileNameHeader = WopiHeaderPrefix + "InvalidFileNameError"
 
 	MethodLock           = "LOCK"
 	MethodUnlock         = "UNLOCK"

@@ -1,6 +1,7 @@
 package share
 
 import (
+	"context"
 	"net/url"
 
 	"github.com/cloudreve/Cloudreve/v4/ent"
@@ -18,7 +19,7 @@ type ListShareResponse struct {
 	Pagination *inventory.PaginationResults `json:"pagination"`
 }
 
-func BuildListShareResponse(res *inventory.ListShareResult, hasher hashid.Encoder, base *url.URL, requester *ent.User, unlocked bool) *ListShareResponse {
+func BuildListShareResponse(ctx context.Context, res *inventory.ListShareResult, hasher hashid.Encoder, base *url.URL, requester *ent.User, unlocked bool) *ListShareResponse {
 	var infos []explorer.Share
 	for _, share := range res.Shares {
 		expired := inventory.IsValidShare(share) != nil
@@ -36,7 +37,7 @@ func BuildListShareResponse(res *inventory.ListShareResult, hasher hashid.Encode
 			}
 		}
 
-		infos = append(infos, *explorer.BuildShare(share, base, hasher, requester, share.Edges.User, shareName,
+		infos = append(infos, *explorer.BuildShare(ctx, share, base, hasher, requester, share.Edges.User, shareName,
 			types.FileType(share.Edges.File.Type), unlocked, expired))
 	}
 

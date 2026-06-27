@@ -34,12 +34,20 @@ func (s *ExplorerEventService) HandleExplorerEventsPush(c *gin.Context) error {
 	}
 
 	// Make sure target is a valid folder that the user can listen to
-	parent, _, err := m.List(c, uri, &manager.ListArgs{
+	parent, listRes, err := m.List(c, uri, &manager.ListArgs{
 		Page:     0,
 		PageSize: 1,
 	})
 	if err != nil {
 		return serializer.NewError(serializer.CodeParamErr, "Requested uri not available", err)
+	}
+
+	// Reject event subscriptions on single-file views (e.g. single-file shares).
+	// The listed parent is the underlying owner-side folder containing the file,
+	// while the subscriber is only authorized to observe the shared file itself.
+	// Subscribing to that folder topic would leak events about unshared siblings.
+	if listRes != nil && listRes.SingleFileView {
+		return serializer.NewError(serializer.CodeNoPermissionErr, "Event subscriptions are not supported on this view", nil)
 	}
 
 	requestInfo := requestinfo.RequestInfoFromContext(c)

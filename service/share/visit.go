@@ -87,7 +87,7 @@ func (s *ShareInfoService) Get(c *gin.Context) (*explorer.Share, error) {
 	}
 
 	base := dep.SettingProvider().SiteURL(c)
-	res := explorer.BuildShare(share, base, dep.HashIDEncoder(), u, share.Edges.User, share.Edges.File.Name,
+	res := explorer.BuildShare(c, share, base, dep.HashIDEncoder(), u, share.Edges.User, share.Edges.File.Name,
 		types.FileType(share.Edges.File.Type), unlocked, false)
 
 	if s.OwnerExtended && share.Edges.User.ID == u.ID {
@@ -148,7 +148,7 @@ func (s *ListShareService) List(c *gin.Context) (*ListShareResponse, error) {
 	}
 
 	base := dep.SettingProvider().SiteURL(ctx)
-	return BuildListShareResponse(res, hasher, base, user, true), nil
+	return BuildListShareResponse(ctx, res, hasher, base, user, true), nil
 }
 
 func (s *ListShareService) ListInUserProfile(c *gin.Context, uid int) (*ListShareResponse, error) {
@@ -188,5 +188,5 @@ func (s *ListShareService) ListInUserProfile(c *gin.Context, uid int) (*ListShar
 	}
 
 	base := dep.SettingProvider().SiteURL(ctx)
-	return BuildListShareResponse(res, hasher, base, user, false), nil
+	return BuildListShareResponse(ctx, res, hasher, base, user, false), nil
 }

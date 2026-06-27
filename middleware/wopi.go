@@ -1,6 +1,10 @@
 package middleware
 
 import (
+	"crypto/subtle"
+	"net/http"
+	"strings"
+
 	"github.com/cloudreve/Cloudreve/v4/application/dependency"
 	"github.com/cloudreve/Cloudreve/v4/inventory/types"
 	"github.com/cloudreve/Cloudreve/v4/pkg/filemanager/manager"
@@ -8,8 +12,6 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/pkg/util"
 	"github.com/cloudreve/Cloudreve/v4/pkg/wopi"
 	"github.com/gin-gonic/gin"
-	"net/http"
-	"strings"
 )
 
 // WopiWriteAccess validates if write access is obtained.
@@ -33,15 +35,16 @@ func ViewerSessionValidation() gin.HandlerFunc {
 		store := dep.KV()
 		settings := dep.SettingProvider()
 
-		accessToken := strings.Split(c.Query(wopi.AccessTokenQuery), ".")
-		if len(accessToken) != 2 {
+		accessToken := c.Query(wopi.AccessTokenQuery)
+		sessionID, _, ok := strings.Cut(accessToken, ".")
+		if !ok || sessionID == "" {
 			c.Status(http.StatusForbidden)
 			c.Header(wopi.ServerErrorHeader, "malformed access token")
 			c.Abort()
 			return
 		}
 
-		sessionRaw, exist := store.Get(manager.ViewerSessionCachePrefix + accessToken[0])
+		sessionRaw, exist := store.Get(manager.ViewerSessionCachePrefix + sessionID)
 		if !exist {
 			c.Status(http.StatusForbidden)
 			c.Header(wopi.ServerErrorHeader, "invalid access token")
@@ -50,6 +53,13 @@ func ViewerSessionValidation() gin.HandlerFunc {
 		}
 
 		session := sessionRaw.(manager.ViewerSessionCache)
+		if subtle.ConstantTimeCompare([]byte(accessToken), []byte(session.Token)) != 1 {
+			c.Status(http.StatusForbidden)
+			c.Header(wopi.ServerErrorHeader, "invalid access token")
+			c.Abort()
+			return
+		}
+
 		if err := SetUserCtx(c, session.UserID); err != nil {
 			c.Status(http.StatusInternalServerError)
 			c.Header(wopi.ServerErrorHeader, "user not found")

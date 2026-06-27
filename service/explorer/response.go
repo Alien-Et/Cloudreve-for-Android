@@ -343,7 +343,7 @@ type Share struct {
 	SourceUri string `json:"source_uri,omitempty"`
 }
 
-func BuildShare(s *ent.Share, base *url.URL, hasher hashid.Encoder, requester *ent.User, owner *ent.User,
+func BuildShare(ctx context.Context, s *ent.Share, base *url.URL, hasher hashid.Encoder, requester *ent.User, owner *ent.User,
 	name string, t types.FileType, unlocked bool, expired bool) *Share {
 	redactLevel := user.RedactLevelAnonymous
 	if !inventory.IsAnonymousUser(requester) {
@@ -353,7 +353,7 @@ func BuildShare(s *ent.Share, base *url.URL, hasher hashid.Encoder, requester *e
 		Name:              name,
 		ID:                hashid.EncodeShareID(hasher, s.ID),
 		Unlocked:          unlocked,
-		Owner:             user.BuildUserRedacted(owner, redactLevel, hasher),
+		Owner:             user.BuildUserRedacted(ctx, owner, redactLevel, hasher),
 		Expired:           inventory.IsShareExpired(s) != nil || expired,
 		Url:               BuildShareLink(s, hasher, base, unlocked),
 		CreatedAt:         s.CreatedAt,
@@ -446,7 +446,7 @@ func BuildExtendedInfo(ctx context.Context, u *ent.User, f fs.File, hasher hashi
 		StoragePolicy: BuildStoragePolicy(extendedInfo.StoragePolicy, hasher),
 		StorageUsed:   extendedInfo.StorageUsed,
 		Entities: lo.Map(f.Entities(), func(e fs.Entity, index int) Entity {
-			return BuildEntity(extendedInfo, e, hasher)
+			return BuildEntity(ctx, extendedInfo, e, hasher)
 		}),
 		DirectLinks: lo.Map(extendedInfo.DirectLinks, func(d *ent.DirectLink, index int) DirectLink {
 			return BuildDirectLink(d, hasher, base)
@@ -456,7 +456,7 @@ func BuildExtendedInfo(ctx context.Context, u *ent.User, f fs.File, hasher hashi
 	if u.ID == f.OwnerID() {
 		// Only owner can see the shares settings.
 		ext.Shares = lo.Map(extendedInfo.Shares, func(s *ent.Share, index int) Share {
-			return *BuildShare(s, base, hasher, u, u, f.DisplayName(), f.Type(), true, false)
+			return *BuildShare(ctx, s, base, hasher, u, u, f.DisplayName(), f.Type(), true, false)
 		})
 		ext.View = extendedInfo.View
 	}
@@ -473,11 +473,11 @@ func BuildDirectLink(d *ent.DirectLink, hasher hashid.Encoder, base *url.URL) Di
 	}
 }
 
-func BuildEntity(extendedInfo *fs.FileExtendedInfo, e fs.Entity, hasher hashid.Encoder) Entity {
+func BuildEntity(ctx context.Context, extendedInfo *fs.FileExtendedInfo, e fs.Entity, hasher hashid.Encoder) Entity {
 	var u *user.User
 	createdBy := e.CreatedBy()
 	if createdBy != nil {
-		userRedacted := user.BuildUserRedacted(e.CreatedBy(), user.RedactLevelAnonymous, hasher)
+		userRedacted := user.BuildUserRedacted(ctx, e.CreatedBy(), user.RedactLevelAnonymous, hasher)
 		u = &userRedacted
 	}
 
