@@ -2,6 +2,7 @@ package dbfs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"path"
@@ -70,8 +71,12 @@ func (f *DBFS) PreValidateUpload(ctx context.Context, dst *fs.URI, files ...fs.P
 }
 
 func (f *DBFS) PrepareUpload(ctx context.Context, req *fs.UploadRequest, opts ...fs.Option) (*fs.UploadSession, error) {
-	// Get navigator
-	navigator, err := f.getNavigator(ctx, req.Props.Uri, NavigatorCapabilityUploadFile, NavigatorCapabilityLockFile)
+	// Get navigator.
+	requiredCaps := []NavigatorCapability{NavigatorCapabilityUploadFile, NavigatorCapabilityLockFile}
+	if req.Props.EntityType != nil && *req.Props.EntityType == types.EntityTypeThumbnail {
+		requiredCaps = []NavigatorCapability{NavigatorCapabilityGenerateThumb, NavigatorCapabilityLockFile}
+	}
+	navigator, err := f.getNavigator(ctx, req.Props.Uri, requiredCaps...)
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +153,12 @@ func (f *DBFS) PrepareUpload(ctx context.Context, req *fs.UploadRequest, opts ..
 		return nil, err
 	}
 
-	// Validate available capacity
-	if err := f.validateUserCapacity(ctx, req.Props.Size, ancestor.Owner()); err != nil {
+	owner := ancestor.Owner()
+	capacity, err := f.Capacity(ctx, owner)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user capacity: %s", err)
+	}
+	if err := f.validateUserCapacityRaw(ctx, req.Props.Size, capacity); err != nil {
 		return nil, err
 	}
 
@@ -174,6 +183,14 @@ func (f *DBFS) PrepareUpload(ctx context.Context, req *fs.UploadRequest, opts ..
 	fc, dbTx, ctx, err := inventory.WithTx(ctx, f.fileClient)
 	if err != nil {
 		return nil, serializer.NewError(serializer.CodeDBError, "Failed to start transaction", err)
+	}
+
+	if err := dbTx.ReserveStorage(ctx, f.userClient, owner.ID, req.Props.Size, capacity.Total); err != nil {
+		_ = inventory.Rollback(dbTx)
+		if errors.Is(err, inventory.ErrInsufficientCapacity) {
+			return nil, fs.ErrInsufficientCapacity
+		}
+		return nil, serializer.NewError(serializer.CodeDBError, "Failed to reserve storage capacity", err)
 	}
 
 	if fileExisted {
