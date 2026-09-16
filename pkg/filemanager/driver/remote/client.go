@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -177,7 +178,7 @@ func (c *remoteClient) DeleteFiles(ctx context.Context, files ...string) ([]stri
 		if resp.Code == serializer.CodeNotFullySuccess {
 			resp.GobDecode(&failed)
 		}
-		return failed, fmt.Errorf(resp.Error)
+		return failed, errors.New(resp.Error)
 	}
 
 	return nil, nil
@@ -196,7 +197,7 @@ func (c *remoteClient) MediaMeta(ctx context.Context, src, ext, language string)
 	}
 
 	if resp.Code != 0 {
-		return nil, fmt.Errorf(resp.Error)
+		return nil, errors.New(resp.Error)
 	}
 
 	var metas []driver.MediaMeta

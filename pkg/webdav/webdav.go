@@ -619,10 +619,16 @@ func handleCopyMove(c *gin.Context, user *ent.User, fm manager.FileManager) (sta
 	if err != nil && !ent.IsNotFound(err) {
 		return purposeStatusCodeFromError(err), err
 	}
+	dstExists := err == nil
 
 	_, dstFolderUri, err := fm.SharedAddressTranslation(c, dst.DirUri())
 	if err != nil {
 		return purposeStatusCodeFromError(err), err
+	}
+
+	overwrite, err := parseOverwrite(c.Request.Header.Get("Overwrite"))
+	if err != nil {
+		return http.StatusBadRequest, err
 	}
 
 	hasher := dependency.FromContext(c).HashIDEncoder()
@@ -655,9 +661,7 @@ func handleCopyMove(c *gin.Context, user *ent.User, fm manager.FileManager) (sta
 			}
 		}
 
-		if err := fm.MoveOrCopy(ctx, []*fs.URI{srcUri}, dstFolderUri, true); err != nil {
-			return purposeStatusCodeFromError(err), err
-		}
+		return performCopyMove(ctx, fm, srcUri, dstUri, dstFolderUri, true, overwrite, dstExists)
 	}
 
 	release, ls, status, err := confirmLock(c, fm, user, srcTarget, dstTarget, srcUri, dstUri)
@@ -675,7 +679,42 @@ func handleCopyMove(c *gin.Context, user *ent.User, fm manager.FileManager) (sta
 			return http.StatusBadRequest, errInvalidDepth
 		}
 	}
-	if err := fm.MoveOrCopy(ctx, []*fs.URI{srcUri}, dstFolderUri, false); err != nil {
+	return performCopyMove(ctx, fm, srcUri, dstUri, dstFolderUri, false, overwrite, dstExists)
+}
+
+type copyMoveOperations interface {
+	Delete(ctx context.Context, path []*fs.URI, opts ...fs.Option) error
+	MoveOrCopy(ctx context.Context, src []*fs.URI, dst *fs.URI, isCopy bool) error
+	Rename(ctx context.Context, path *fs.URI, newName string) (fs.File, error)
+}
+
+func parseOverwrite(value string) (bool, error) {
+	switch value {
+	case "", "T":
+		return true, nil
+	case "F":
+		return false, nil
+	default:
+		return false, errInvalidOverwrite
+	}
+}
+
+func performCopyMove(
+	ctx context.Context,
+	fm copyMoveOperations,
+	srcUri, dstUri, dstFolderUri *fs.URI,
+	isCopy, overwrite, dstExists bool,
+) (int, error) {
+	if dstExists {
+		if !overwrite {
+			return http.StatusPreconditionFailed, errDestinationExists
+		}
+		if err := fm.Delete(ctx, []*fs.URI{dstUri}); err != nil {
+			return purposeStatusCodeFromError(err), err
+		}
+	}
+
+	if err := fm.MoveOrCopy(ctx, []*fs.URI{srcUri}, dstFolderUri, isCopy); err != nil {
 		return purposeStatusCodeFromError(err), err
 	}
 
@@ -685,7 +724,10 @@ func handleCopyMove(c *gin.Context, user *ent.User, fm manager.FileManager) (sta
 		}
 	}
 
-	return http.StatusNoContent, nil
+	if dstExists {
+		return http.StatusNoContent, nil
+	}
+	return http.StatusCreated, nil
 }
 
 func handleProppatch(c *gin.Context, user *ent.User, fm manager.FileManager) (status int, err error) {
@@ -833,12 +875,14 @@ func StatusText(code int) string {
 
 var (
 	errDestinationEqualsSource = errors.New("webdav: destination equals source")
+	errDestinationExists       = errors.New("webdav: destination exists")
 	errDirectoryNotEmpty       = errors.New("webdav: directory not empty")
 	errInvalidDepth            = errors.New("webdav: invalid depth")
 	errInvalidDestination      = errors.New("webdav: invalid destination")
 	errInvalidIfHeader         = errors.New("webdav: invalid If header")
 	errInvalidLockInfo         = errors.New("webdav: invalid lock info")
 	errInvalidLockToken        = errors.New("webdav: invalid lock token")
+	errInvalidOverwrite        = errors.New("webdav: invalid overwrite")
 	errInvalidPropfind         = errors.New("webdav: invalid propfind")
 	errInvalidProppatch        = errors.New("webdav: invalid proppatch")
 	errInvalidResponse         = errors.New("webdav: invalid response")

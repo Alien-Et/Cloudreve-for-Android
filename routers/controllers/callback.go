@@ -83,7 +83,8 @@ func UpyunCallbackAuth(c *gin.Context) {
 	if err := upyun.ValidateCallback(c, uploadSession); err != nil {
 		l.Error("Failed to verify callback request: %s", err)
 
-		c.JSON(401, serializer.GeneralUploadCallbackFailed{Error: "Failed to verify callback request."})
+		c.AbortWithStatusJSON(401, serializer.GeneralUploadCallbackFailed{Error: "Failed to verify callback request."})
+		return
 	}
 
 	c.Next()

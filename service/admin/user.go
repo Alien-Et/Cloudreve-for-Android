@@ -13,6 +13,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v4/pkg/hashid"
 	"github.com/cloudreve/Cloudreve/v4/pkg/serializer"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/samber/lo"
 )
 
@@ -138,13 +139,31 @@ func (service *SingleUserService) CalibrateStorage(c *gin.Context) (*GetUserResp
 type (
 	UpsertUserService struct {
 		User     *ent.User `json:"user" binding:"required"`
-		Password string    `json:"password"`
+		Password string    `json:"password" binding:"omitempty,min=6,max=128"`
 		TwoFA    string    `json:"two_fa"`
 	}
 	UpsertUserParamCtx struct{}
 )
 
+type adminUserEmailValidation struct {
+	Email string `binding:"required,email"`
+}
+
+func (s *UpsertUserService) validateEmail() error {
+	if s.User == nil {
+		return serializer.NewError(serializer.CodeParamErr, "Email format error", nil)
+	}
+	if err := binding.Validator.ValidateStruct(adminUserEmailValidation{Email: s.User.Email}); err != nil {
+		return serializer.NewError(serializer.CodeParamErr, "Email format error", err)
+	}
+	return nil
+}
+
 func (s *UpsertUserService) Update(c *gin.Context) (*GetUserResponse, error) {
+	if err := s.validateEmail(); err != nil {
+		return nil, err
+	}
+
 	dep := dependency.FromContext(c)
 	userClient := dep.UserClient()
 
@@ -165,10 +184,6 @@ func (s *UpsertUserService) Update(c *gin.Context) (*GetUserResponse, error) {
 
 	}
 
-	if s.Password != "" && len(s.Password) > 128 {
-		return nil, serializer.NewError(serializer.CodeParamErr, "Password too long", nil)
-	}
-
 	newUser, err := userClient.Upsert(ctx, s.User, s.Password, s.TwoFA)
 	if err != nil {
 		return nil, serializer.NewError(serializer.CodeDBError, "Failed to update user", err)
@@ -179,12 +194,16 @@ func (s *UpsertUserService) Update(c *gin.Context) (*GetUserResponse, error) {
 }
 
 func (s *UpsertUserService) Create(c *gin.Context) (*GetUserResponse, error) {
-	dep := dependency.FromContext(c)
-	userClient := dep.UserClient()
+	if err := s.validateEmail(); err != nil {
+		return nil, err
+	}
 
 	if s.Password == "" {
 		return nil, serializer.NewError(serializer.CodeParamErr, "Password is required", nil)
 	}
+
+	dep := dependency.FromContext(c)
+	userClient := dep.UserClient()
 
 	if s.User.ID != 0 {
 		return nil, serializer.NewError(serializer.CodeParamErr, "ID must be 0", nil)

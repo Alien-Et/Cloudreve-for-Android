@@ -54,7 +54,7 @@ func (f *DBFS) Create(ctx context.Context, path *fs.URI, fileType types.FileType
 
 		// File with the same name but different type already exist
 		return nil, fs.ErrFileExisted.
-			WithError(fmt.Errorf("object with the same name but different type %q already exist", ancestor.Type()))
+			WithError(fmt.Errorf("object with the same name but different type %v already exist", ancestor.Type()))
 	}
 
 	if _, ok := ctx.Value(ByPassOwnerCheckCtxKey{}).(bool); !ok && ancestor.Owner().ID != f.user.ID {

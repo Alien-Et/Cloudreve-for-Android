@@ -319,7 +319,7 @@ func lockTupleFromUri(uri *fs.URI, u *ent.User, hasher hashid.Encoder) (string, 
 	if id == "" {
 		id = strconv.Itoa(u.ID)
 	}
-	ns := fmt.Sprintf(id + "/" + string(uri.FileSystem()))
+	ns := id + "/" + string(uri.FileSystem())
 	root := uri.Path()
 	return ns, root, ns + "/" + root
 }
