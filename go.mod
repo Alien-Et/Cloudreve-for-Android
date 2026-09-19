@@ -35,7 +35,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.2.2
-	github.com/gorilla/websocket v1.5.3
+	github.com/gorilla/websocket v1.5.0
 	github.com/huaweicloud/huaweicloud-sdk-go-obs v3.24.6+incompatible
 	github.com/jinzhu/gorm v1.9.11
 	github.com/jpillora/backoff v1.0.0
@@ -44,7 +44,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/meilisearch/meilisearch-go v0.36.0
 	github.com/mholt/archives v0.1.3
-	github.com/mojocn/base64Captcha v1.3.6
+	github.com/mojocn/base64Captcha v0.0.0-20190801020520-752b1cd608b2
 	github.com/pquerna/otp v1.2.0
 	github.com/qiniu/go-sdk/v7 v7.19.0
 	github.com/rafaeljusto/redigomock v0.0.0-20191117212112-00b2509252a1
@@ -129,7 +129,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mozillazg/go-httpheader v0.4.0 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
-	github.com/nwaples/rardecode/v2 v2.2.0 // indirect
+	github.com/nwaples/rardecode/v2 v2.1.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -140,7 +140,7 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.0 // indirect
-	github.com/ulikunitz/xz v0.5.14 // indirect
+	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/zclconf/go-cty v1.8.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect

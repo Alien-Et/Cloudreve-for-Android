@@ -216,7 +216,14 @@ func loadShareForOG(c *gin.Context, shareID int, password string) (*explorer.Sha
 
 func renderOGHTML(data *ogData) string {
 	var buf bytes.Buffer
-	if err := ogTemplate.Execute(&buf, data); err != nil {
+	if err := ogTemplate.Execute(&buf, map[string]string{
+		"SiteName":    data.SiteName,
+		"Title":       data.Title,
+		"Description": data.Description,
+		"ImageURL":    data.ImageURL,
+		"ShareURL":    data.ShareURL,
+		"RedirectURL": data.RedirectURL,
+	}); err != nil {
 		return ""
 	}
 	return buf.String()

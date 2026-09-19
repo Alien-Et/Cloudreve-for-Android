@@ -56,8 +56,8 @@ func (s *EntityDownloadService) Serve(c *gin.Context) error {
 type (
 	SetCurrentVersionParamCtx struct{}
 	SetCurrentVersionService  struct {
-		Uri     string `uri:"uri" binding:"required"`
-		Version string `uri:"version" binding:"required"`
+		Uri     string `json:"uri" uri:"uri" binding:"required"`
+		Version string `json:"version" uri:"version" binding:"required"`
 	}
 )
 
@@ -88,8 +88,8 @@ func (s *SetCurrentVersionService) Set(c *gin.Context) error {
 type (
 	DeleteVersionParamCtx struct{}
 	DeleteVersionService  struct {
-		Uri     string `uri:"uri" binding:"required"`
-		Version string `uri:"version" binding:"required"`
+		Uri     string `json:"uri" uri:"uri" binding:"required"`
+		Version string `json:"version" uri:"version" binding:"required"`
 	}
 )
 
